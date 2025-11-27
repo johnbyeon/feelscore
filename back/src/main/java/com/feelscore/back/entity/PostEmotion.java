@@ -2,6 +2,7 @@ package com.feelscore.back.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -20,8 +21,7 @@ public class PostEmotion {
     @JoinColumn(name = "post_id")
     private Post post;
 
-    // ⭐️ 9가지 감정 점수 (Integer)
-    // AI가 분석 못했을 때 null 방지하려면 기본값 0을 넣거나 @Column(nullable=false) 추천
+    // 9가지 감정 점수
     private Integer joyScore;
     private Integer sadnessScore;
     private Integer angerScore;
@@ -33,9 +33,26 @@ public class PostEmotion {
     private Integer neutralScore;
 
     @Enumerated(EnumType.STRING)
-    private EmotionType dominantEmotion; // 이 중에서 점수가 가장 높은 놈 (색인용)
+    private EmotionType dominantEmotion; // 가장 높은 점수의 감정
 
     private Boolean isAnalyzed; // 분석 완료 여부
 
-    // 편의상 생성자나 빌더 패턴을 쓸 때 Python에서 온 JSON을 바로 매핑하기 좋게 필드명 통일함
+    @Builder
+    public PostEmotion(Post post, Integer joyScore, Integer sadnessScore,
+                       Integer angerScore, Integer fearScore, Integer disgustScore,
+                       Integer surpriseScore, Integer contemptScore, Integer loveScore,
+                       Integer neutralScore, EmotionType dominantEmotion, Boolean isAnalyzed) {
+        this.post = post;
+        this.joyScore = joyScore != null ? joyScore : 0;
+        this.sadnessScore = sadnessScore != null ? sadnessScore : 0;
+        this.angerScore = angerScore != null ? angerScore : 0;
+        this.fearScore = fearScore != null ? fearScore : 0;
+        this.disgustScore = disgustScore != null ? disgustScore : 0;
+        this.surpriseScore = surpriseScore != null ? surpriseScore : 0;
+        this.contemptScore = contemptScore != null ? contemptScore : 0;
+        this.loveScore = loveScore != null ? loveScore : 0;
+        this.neutralScore = neutralScore != null ? neutralScore : 0;
+        this.dominantEmotion = dominantEmotion;
+        this.isAnalyzed = isAnalyzed != null ? isAnalyzed : false;
+    }
 }

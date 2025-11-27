@@ -2,6 +2,7 @@ package com.feelscore.back.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -31,4 +32,12 @@ public class Category {
     // 자식 카테고리들 (소분류 리스트)
     @OneToMany(mappedBy = "parent")
     private List<Category> children = new ArrayList<>();
+
+    @Builder
+    public Category(String name, Integer depth, Category parent) {
+        this.name = name;
+        this.depth = depth;
+        this.parent = parent;
+        this.children = new ArrayList<>();
+    }
 }
