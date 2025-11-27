@@ -2,6 +2,7 @@ package com.feelscore.back.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -21,22 +22,27 @@ public class CategoryEmotionStats {
     private Category category;
 
     @Enumerated(EnumType.STRING)
-    private EmotionType emotionType; // JOY, ANGER...
+    private EmotionType emotionType; // JOY, ANGER 등
 
-    // 글의 개수도 계속 늘어나니까 Long (BIGINT) 추천
-    private Long count;
+    private Long count; // 글 개수
 
-    // ⭐️ 수정됨: 점수 총합을 BIGINT로 처리하기 위해 Long 사용
-    // DB에서는 bigint 타입으로 생성됨
     @Column(columnDefinition = "BIGINT DEFAULT 0")
-    private Long totalScore;
+    private Long totalScore; // 점수 총합
 
-    // 점수 누적 메서드 (파라미터는 int로 들어오지만 내부는 Long으로 더함)
+    @Builder
+    public CategoryEmotionStats(Category category, EmotionType emotionType) {
+        this.category = category;
+        this.emotionType = emotionType;
+        this.count = 0L;
+        this.totalScore = 0L;
+    }
+
+    // 점수 누적 메서드
     public void addScore(Integer score) {
         if (this.count == null) this.count = 0L;
         if (this.totalScore == null) this.totalScore = 0L;
 
         this.count += 1;
-        this.totalScore += score; // Long + Integer -> Long (안전함)
+        this.totalScore += score;
     }
 }

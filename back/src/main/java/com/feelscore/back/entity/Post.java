@@ -2,6 +2,7 @@ package com.feelscore.back.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -17,13 +18,13 @@ public class Post extends BaseTimeEntity {
     private Long id;
 
     @Lob // 긴 텍스트
-    @Column(columnDefinition = "TEXT", nullable = false) // TEXT(65kb) 또는 LONGTEXT(4GB)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     @Enumerated(EnumType.STRING)
-    private PostStatus status; // NORMAL, BLIND
+    private PostStatus status; // NORMAL, BLIND, DELETED
 
-    private String blindReason; // 블라인드 사유 (신고누적, 위험단어 등)
+    private String blindReason; // 블라인드 사유
 
     // 연관관계
     @ManyToOne(fetch = FetchType.LAZY)
@@ -33,4 +34,12 @@ public class Post extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
+
+    @Builder
+    public Post(String content, Users users, Category category) {
+        this.content = content;
+        this.users = users;
+        this.category = category;
+        this.status = PostStatus.NORMAL;
+    }
 }
