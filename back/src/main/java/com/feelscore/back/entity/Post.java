@@ -16,6 +16,9 @@ public class Post extends BaseTimeEntity {
     @Column(name = "post_id")
     private Long id;
 
+    @Column(name = "user_id")
+    private Long user_id;
+
     @Lob // 긴 텍스트
     @Column(columnDefinition = "TEXT", nullable = false) // TEXT(65kb) 또는 LONGTEXT(4GB)
     private String content;
