@@ -6,15 +6,28 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.AccessLevel;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class CategoryEmotionStatsDto {
 
-    // 카테고리별 감정 통계 응답
+    // --- 1. Repository Projection Interface (필수) ---
+
+    /**
+     * 리포지토리의 @Query 결과(SUM, GROUP BY 등)를 받는 DTO Projection Interface.
+     * 필드 이름은 @Query의 AS 별칭과 일치해야 합니다.
+     */
+    public interface GlobalStatProjection {
+        EmotionType getEmotionType();
+        Long getTotalCount(); // SUM(count) 결과
+        Long getTotalScore(); // SUM(totalScore) 결과
+    }
+
+    // --- 2. 카테고리별 통계 기본 응답 ---
+
     @Getter
-    @NoArgsConstructor
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
     @AllArgsConstructor
     @Builder
     public static class Response {
@@ -30,6 +43,7 @@ public class CategoryEmotionStatsDto {
                     ? (double) stats.getTotalScore() / stats.getCount()
                     : 0.0;
 
+            // Category 엔티티에 접근하여 ID와 Name을 가져와야 합니다. (Fetch Join 필요)
             return Response.builder()
                     .categoryId(stats.getCategory().getId())
                     .categoryName(stats.getCategory().getName())
@@ -41,9 +55,10 @@ public class CategoryEmotionStatsDto {
         }
     }
 
-    // 카테고리별 감정 순위 응답
+    // --- 3. 카테고리별 감정 순위 응답 ---
+
     @Getter
-    @NoArgsConstructor
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
     @AllArgsConstructor
     @Builder
     public static class RankingResponse {
@@ -52,7 +67,7 @@ public class CategoryEmotionStatsDto {
         private List<EmotionRank> emotionRanks; // 감정별 순위
 
         @Getter
-        @NoArgsConstructor
+        @NoArgsConstructor(access = AccessLevel.PROTECTED)
         @AllArgsConstructor
         @Builder
         public static class EmotionRank {
@@ -64,9 +79,10 @@ public class CategoryEmotionStatsDto {
         }
     }
 
-    // 전체 감정 순위 응답 (카테고리 무관)
+    // --- 4. 전체 감정 순위 응답 (GlobalStatProjection 기반) ---
+
     @Getter
-    @NoArgsConstructor
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
     @AllArgsConstructor
     @Builder
     public static class GlobalRankingResponse {
@@ -91,9 +107,10 @@ public class CategoryEmotionStatsDto {
         }
     }
 
-    // 카테고리 우세 감정 응답 (메인 페이지용)
+    // --- 5. 카테고리 우세 감정 응답 (메인 페이지용) ---
+
     @Getter
-    @NoArgsConstructor
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
     @AllArgsConstructor
     @Builder
     public static class DominantEmotionResponse {
@@ -116,9 +133,10 @@ public class CategoryEmotionStatsDto {
         }
     }
 
-    // 감정별 카테고리 순위 (특정 감정이 강한 카테고리 찾기)
+    // --- 6. 감정별 카테고리 순위 (특정 감정이 강한 카테고리 찾기) ---
+
     @Getter
-    @NoArgsConstructor
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
     @AllArgsConstructor
     @Builder
     public static class EmotionByCategoryResponse {
@@ -126,7 +144,7 @@ public class CategoryEmotionStatsDto {
         private List<CategoryScore> categories;
 
         @Getter
-        @NoArgsConstructor
+        @NoArgsConstructor(access = AccessLevel.PROTECTED)
         @AllArgsConstructor
         @Builder
         public static class CategoryScore {

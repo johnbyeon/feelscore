@@ -18,41 +18,42 @@ public class PostEmotion {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id")
+    @JoinColumn(name = "post_id", nullable = false)
     private Post post;
 
-    // 9가지 감정 점수
-    private Integer joyScore;
-    private Integer sadnessScore;
-    private Integer angerScore;
-    private Integer fearScore;
-    private Integer disgustScore;
-    private Integer surpriseScore;
-    private Integer contemptScore;
-    private Integer loveScore;
-    private Integer neutralScore;
+    @Embedded // 9가지 감정 점수를 하나의 객체로 관리
+    private EmotionScores scores;
 
     @Enumerated(EnumType.STRING)
-    private EmotionType dominantEmotion; // 가장 높은 점수의 감정
+    @Column(nullable = false)
+    private EmotionType dominantEmotion = EmotionType.NEUTRAL; // 기본값 설정
 
-    private Boolean isAnalyzed; // 분석 완료 여부
+    @Column(nullable = false)
+    private boolean isAnalyzed = false; // primitive 타입 사용
 
     @Builder
-    public PostEmotion(Post post, Integer joyScore, Integer sadnessScore,
-                       Integer angerScore, Integer fearScore, Integer disgustScore,
-                       Integer surpriseScore, Integer contemptScore, Integer loveScore,
-                       Integer neutralScore, EmotionType dominantEmotion, Boolean isAnalyzed) {
+    public PostEmotion(Post post, EmotionScores scores, EmotionType dominantEmotion) {
+        if (post == null) {
+            throw new IllegalArgumentException("게시글은 필수입니다.");
+        }
         this.post = post;
-        this.joyScore = joyScore != null ? joyScore : 0;
-        this.sadnessScore = sadnessScore != null ? sadnessScore : 0;
-        this.angerScore = angerScore != null ? angerScore : 0;
-        this.fearScore = fearScore != null ? fearScore : 0;
-        this.disgustScore = disgustScore != null ? disgustScore : 0;
-        this.surpriseScore = surpriseScore != null ? surpriseScore : 0;
-        this.contemptScore = contemptScore != null ? contemptScore : 0;
-        this.loveScore = loveScore != null ? loveScore : 0;
-        this.neutralScore = neutralScore != null ? neutralScore : 0;
-        this.dominantEmotion = dominantEmotion;
-        this.isAnalyzed = isAnalyzed != null ? isAnalyzed : false;
+        this.scores = scores;
+        this.dominantEmotion = dominantEmotion != null ? dominantEmotion : EmotionType.NEUTRAL;
+        this.isAnalyzed = false;
+    }
+
+    // 감정 분석 결과 업데이트 (재분석 시 사용)
+    public void updateAnalysis(EmotionScores newScores, EmotionType dominantEmotion) {
+        if (newScores == null) {
+            throw new IllegalArgumentException("감정 점수는 필수입니다.");
+        }
+        this.scores = newScores;
+        this.dominantEmotion = dominantEmotion != null ? dominantEmotion : EmotionType.NEUTRAL;
+        this.isAnalyzed = true;
+    }
+
+    // 분석 완료 처리 (점수 없이 완료만 표시할 때 사용)
+    public void markAsAnalyzed() {
+        this.isAnalyzed = true;
     }
 }
