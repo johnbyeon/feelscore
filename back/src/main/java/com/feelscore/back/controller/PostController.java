@@ -1,6 +1,9 @@
 package com.feelscore.back.controller;
 
+import com.feelscore.back.dto.PostDto;
 import com.feelscore.back.service.PostService;
+import com.feelscore.back.service.PostViewService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,20 +21,20 @@ import static com.feelscore.back.dto.PostDto.*;
 public class PostController {
 
     private final PostService postService;
+    private final PostViewService postViewService;
 
     /**
      * 게시글 생성
      * POST /api/v1/posts
      *
      * @param request 게시글 생성 요청 DTO
-     * @param userId 게시글 작성자 ID
+     * @param userId  게시글 작성자 ID
      * @return 생성된 게시글 상세 응답 DTO
      */
     @PostMapping
     public ResponseEntity<Response> createPost(
             @RequestBody @Valid CreateRequest request,
-            @RequestParam Long userId
-    ) {
+            @RequestParam Long userId) {
         Response response = postService.createPost(request, userId);
         return ResponseEntity.ok(response);
     }
@@ -44,9 +47,12 @@ public class PostController {
      * @return 게시글 상세 응답 DTO
      */
     @GetMapping("/{postId}")
-    public ResponseEntity<Response> getPostById(@PathVariable Long postId) {
-        Response response = postService.getPostById(postId);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<PostDto.Response> getPostById(@PathVariable Long postId,
+            @RequestParam(required = false) Long userId,
+            HttpServletRequest request) {
+        String ipAddress = request.getRemoteAddr();
+        postViewService.increaseViewCount(postId, userId, ipAddress);
+        return ResponseEntity.ok(postService.getPostById(postId));
     }
 
     /**
@@ -54,14 +60,13 @@ public class PostController {
      * GET /api/v1/posts/category/{categoryId}
      *
      * @param categoryId 조회할 카테고리 ID
-     * @param pageable 페이징 정보 (size, page, sort)
+     * @param pageable   페이징 정보 (size, page, sort)
      * @return 게시글 목록 응답 DTO (페이징 포함)
      */
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<Page<ListResponse>> getPostsByCategory(
             @PathVariable Long categoryId,
-            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-    ) {
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<ListResponse> responses = postService.getPostsByCategory(categoryId, pageable);
         return ResponseEntity.ok(responses);
     }
@@ -70,15 +75,14 @@ public class PostController {
      * 특정 사용자 게시글 목록 조회 (페이징)
      * GET /api/v1/posts/user/{userId}
      *
-     * @param userId 조회할 사용자 ID
+     * @param userId   조회할 사용자 ID
      * @param pageable 페이징 정보 (size, page, sort)
      * @return 게시글 목록 응답 DTO (페이징 포함)
      */
     @GetMapping("/user/{userId}")
     public ResponseEntity<Page<ListResponse>> getPostsByUser(
             @PathVariable Long userId,
-            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-    ) {
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<ListResponse> responses = postService.getPostsByUser(userId, pageable);
         return ResponseEntity.ok(responses);
     }
@@ -87,17 +91,16 @@ public class PostController {
      * 게시글 수정
      * PUT /api/v1/posts/{postId}
      *
-     * @param postId 수정할 게시글 ID
+     * @param postId  수정할 게시글 ID
      * @param request 게시글 수정 요청 DTO
-     * @param userId 요청한 사용자 ID (작성자 확인용)
+     * @param userId  요청한 사용자 ID (작성자 확인용)
      * @return 수정된 게시글 상세 응답 DTO
      */
     @PutMapping("/{postId}")
     public ResponseEntity<Response> updatePost(
             @PathVariable Long postId,
             @RequestBody @Valid UpdateRequest request,
-            @RequestParam Long userId
-    ) {
+            @RequestParam Long userId) {
         Response response = postService.updatePost(postId, request, userId);
         return ResponseEntity.ok(response);
     }
@@ -113,8 +116,7 @@ public class PostController {
     @DeleteMapping("/{postId}")
     public ResponseEntity<Void> deletePost(
             @PathVariable Long postId,
-            @RequestParam Long userId
-    ) {
+            @RequestParam Long userId) {
         postService.deletePost(postId, userId);
         return ResponseEntity.noContent().build();
     }

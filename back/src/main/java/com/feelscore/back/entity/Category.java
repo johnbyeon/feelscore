@@ -33,6 +33,9 @@ public class Category {
     @OneToMany(mappedBy = "parent")
     private List<Category> children = new ArrayList<>();
 
+    @ManyToMany(mappedBy = "categories")
+    private List<CategoryVersion> versions = new ArrayList<>();
+
     @Builder
     public Category(String name, Integer depth, Category parent) {
         this.name = name;

@@ -31,8 +31,8 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
     private final UserRepository userRepository;
 
     public LoginFilter(AuthenticationManager authenticationManager,
-                       JwtTokenService jwtTokenService,
-                       UserRepository userRepository) {
+            JwtTokenService jwtTokenService,
+            UserRepository userRepository) {
         this.jwtTokenService = Objects.requireNonNull(jwtTokenService);
         this.userRepository = Objects.requireNonNull(userRepository);
         // 부모 필터에 AuthenticationManager 주입
@@ -47,7 +47,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
      */
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request,
-                                                HttpServletResponse response)
+            HttpServletResponse response)
             throws AuthenticationException {
 
         log.info("🟢 [LoginFilter] attemptAuthentication() 진입");
@@ -68,15 +68,15 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
             } else {
                 // 2) form 요청이면 파라미터에서 읽기
                 email = StringUtils.hasText(request.getParameter("email")) ? request.getParameter("email") : "";
-                password = StringUtils.hasText(request.getParameter("password")) ? request.getParameter("password") : "";
+                password = StringUtils.hasText(request.getParameter("password")) ? request.getParameter("password")
+                        : "";
             }
 
             if (!StringUtils.hasText(email) || !StringUtils.hasText(password)) {
                 throw new BadCredentialsException("이메일/비밀번호를 확인해주세요.");
             }
 
-            UsernamePasswordAuthenticationToken authRequest =
-                    new UsernamePasswordAuthenticationToken(email, password);
+            UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(email, password);
 
             setDetails(request, authRequest);
             return this.getAuthenticationManager().authenticate(authRequest);
@@ -88,9 +88,9 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
     @Override
     protected void successfulAuthentication(HttpServletRequest request,
-                                            HttpServletResponse response,
-                                            FilterChain chain,
-                                            Authentication authResult) throws IOException {
+            HttpServletResponse response,
+            FilterChain chain,
+            Authentication authResult) throws IOException {
         log.info("🟢 [LoginFilter] successfulAuthentication() 진입");
         log.info("🟢 인증 성공: {}", authResult.getName());
 
@@ -107,11 +107,17 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
         String accessToken = jwtTokenService.createAccessToken(email, role);
         String refreshToken = jwtTokenService.createRefreshToken(email);
 
-        // 마지막 로그인 시각 업데이트 (있다면)
-        userRepository.findByEmail(email).ifPresent(Users::updateLastLogin);
-
         // 응답 JSON 만들기
         Map<String, Object> payload = new HashMap<>();
+
+        // 마지막 로그인 시각 업데이트 (있다면) & ID/Nickname 추가
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.updateLastLogin();
+            payload.put("id", user.getId());
+            payload.put("nickname", user.getNickname());
+        });
+
+        // 응답 JSON 만들기
         payload.put("access_token", accessToken);
         payload.put("refresh_token", refreshToken);
         payload.put("token_type", "Bearer");
@@ -134,8 +140,8 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
     @Override
     protected void unsuccessfulAuthentication(HttpServletRequest request,
-                                              HttpServletResponse response,
-                                              AuthenticationException failed)
+            HttpServletResponse response,
+            AuthenticationException failed)
             throws IOException {
         log.info("🔴 [LoginFilter] unsuccessfulAuthentication: {}", failed.getMessage());
 
@@ -144,8 +150,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
         Map<String, Object> err = Map.of(
                 "error", "invalid_grant",
-                "error_description", "아이디 또는 비밀번호가 올바르지 않습니다."
-        );
+                "error_description", "아이디 또는 비밀번호가 올바르지 않습니다.");
 
         try (PrintWriter out = response.getWriter()) {
             out.print(objectMapper.writeValueAsString(err));
@@ -156,6 +161,8 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
     public static final class LoginRequest {
         public String email;
         public String password;
-        public LoginRequest() {}
+
+        public LoginRequest() {
+        }
     }
 }

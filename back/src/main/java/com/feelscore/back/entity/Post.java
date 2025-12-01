@@ -46,4 +46,16 @@ public class Post extends BaseTimeEntity {
     public Post(Long id) {
         this.id = id;
     }
+
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
+    public void updateCategory(Category category) {
+        this.category = category;
+    }
+
+    public void setStatus(PostStatus status) {
+        this.status = status;
+    }
 }
