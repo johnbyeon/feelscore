@@ -1,0 +1,49 @@
+package com.feelscore.back.controller;
+
+import com.feelscore.back.entity.Users;
+import com.feelscore.back.entity.Role;
+import com.feelscore.back.repository.UserRepository;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/user")
+@RequiredArgsConstructor
+public class UserController {
+
+    private final UserRepository userRepository;
+
+    /** 내 정보 조회 (JWT 필요) */
+    @GetMapping("/me")
+    public ResponseEntity<UserMeResponse> getMyInfo(Authentication authentication) {
+
+        // LoginFilter + CustomUserDetails 에서 넣어준 username(email)
+        String email = authentication.getName();
+
+        Users user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        UserMeResponse response = new UserMeResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getRole()
+        );
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class UserMeResponse {
+        private Long id;
+        private String email;
+        private String nickname;
+        private Role role;
+    }
+}
