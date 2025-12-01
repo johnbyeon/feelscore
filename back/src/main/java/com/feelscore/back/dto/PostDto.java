@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
+import jakarta.annotation.Nullable;
 
 public class PostDto {
 
@@ -64,6 +65,8 @@ public class PostDto {
         private CategoryDto.SimpleResponse category;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        @Nullable
+        private PostEmotionDto.Response postEmotion;
 
         public static Response from(Post post) {
             return Response.builder()
@@ -75,6 +78,7 @@ public class PostDto {
                     .category(CategoryDto.SimpleResponse.from(post.getCategory()))
                     .createdAt(post.getCreatedAt())
                     .updatedAt(post.getUpdatedAt())
+                    .postEmotion(post.getPostEmotion() != null ? PostEmotionDto.Response.from(post.getPostEmotion()) : null)
                     .build();
         }
     }

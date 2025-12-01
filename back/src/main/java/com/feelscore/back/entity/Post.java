@@ -35,11 +35,26 @@ public class Post extends BaseTimeEntity {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @OneToOne(mappedBy = "post", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private PostEmotion postEmotion;
+
     @Builder
     public Post(String content, Users users, Category category) {
         this.content = content;
         this.users = users;
         this.category = category;
         this.status = PostStatus.NORMAL;
+    }
+
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
+    public void updateCategory(Category category) {
+        this.category = category;
+    }
+
+    public void setStatus(PostStatus status) {
+        this.status = status;
     }
 }
