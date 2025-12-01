@@ -45,4 +45,20 @@ public class CategoryEmotionStats {
         this.count += 1;
         this.totalScore += score;
     }
+
+    // 통계 차감 및 동기화
+    public void subtractScore(Integer score) {
+        // 1. 카운트가 0 이상일 때만 -1 처리
+        if (this.count != null && this.count > 0) {
+            this.count -= 1; // 글 개수 차감
+        } else {
+            this.count = 0L;
+        }
+
+        if (this.totalScore != null) {
+            this.totalScore -= score; // 점수 총합 차감
+        } else {
+            this.totalScore = 0L;
+        }
+    }
 }

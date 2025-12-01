@@ -42,4 +42,8 @@ public class Post extends BaseTimeEntity {
         this.category = category;
         this.status = PostStatus.NORMAL;
     }
+
+    public Post(Long id) {
+        this.id = id;
+    }
 }
