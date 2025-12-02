@@ -41,9 +41,19 @@ public class Users extends BaseTimeEntity {
         this.role = role == null ? Role.USER : role;
     }
 
-
-    // 로그인 시 업데이트 메서드
+    /**
+     * @brief 유저의 마지막 로그인 시간을 업데이트합니다.
+     */
     public void updateLastLogin() {
         this.lastLoginAt = LocalDateTime.now();
+    }
+
+    /**
+     * @brief 유저의 역할을 업데이트합니다.
+     *        관리자 패널 등에서 유저의 권한을 변경할 때 사용됩니다.
+     * @param newRole 새로 설정할 유저 역할 (ROLE_USER, ROLE_ADMIN 등)
+     */
+    public void updateRole(Role newRole) {
+        this.role = newRole;
     }
 }

@@ -23,7 +23,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     sql:
       init:
         mode: always
@@ -69,6 +69,17 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+
+  # ✅ S3 설정 (local)
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}
+        secret-key: ${AWS_SECRET_ACCESS_KEY}
+      region:
+        static: ap-northeast-2
+      s3:
+        bucket: feelscore-s3
 
 logging:
   level:
@@ -133,6 +144,17 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+
+  # ✅ S3 설정 (prod)
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}
+        secret-key: ${AWS_SECRET_ACCESS_KEY}
+      region:
+        static: ap-northeast-2
+      s3:
+        bucket: feelscore-s3
 
 logging:
   level:
