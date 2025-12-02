@@ -1,7 +1,7 @@
 plugins {
-	id 'java'
+    id 'java'
     id 'org.springframework.boot' version '3.3.5'
-	id 'io.spring.dependency-management' version '1.1.7'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.feelscore'
@@ -9,46 +9,49 @@ version = '0.0.1-SNAPSHOT'
 description = 'Demo project for Spring Boot'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
 
 configurations {
-	compileOnly {
-		extendsFrom annotationProcessor
-	}
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
 }
 
 repositories {
-	mavenCentral()
+    mavenCentral()
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'  //추가
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'  //추가
-	compileOnly 'org.projectlombok:lombok'
-	runtimeOnly 'com.mysql:mysql-connector-j'
+    compileOnly 'org.projectlombok:lombok'
+    runtimeOnly 'com.mysql:mysql-connector-j'
 
     // 🔐 JJWT (JWT 토큰 생성/파싱 라이브러리)
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5' // JSON 처리용
 
-	annotationProcessor 'org.projectlombok:lombok'
+    // ☁️ AWS SDK for S3 추가
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.12.720' // AWS SDK v1 S3 모듈
 
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-	// Spring Boot Test 기본 의존성 (필수)
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    annotationProcessor 'org.projectlombok:lombok'
 
-	// Mockito Core 및 JUnit 5 연동 의존성
-	testImplementation 'org.mockito:mockito-core'
-	testImplementation 'org.mockito:mockito-junit-jupiter' // ⬅️ JUnit 5와 Mockito 연동을 위해 필요
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // Spring Boot Test 기본 의존성 (필수)
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // Mockito Core 및 JUnit 5 연동 의존성
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter' // ⬅️ JUnit 5와 Mockito 연동을 위해 필요
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
 }

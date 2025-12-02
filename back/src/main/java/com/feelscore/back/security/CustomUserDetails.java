@@ -21,10 +21,9 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
 
-        // Role enum 그대로 쓰기 때문에 ROLE_ 붙여주는 작업 필요
         String roleName = (user.getRole() != null)
                 ? "ROLE_" + user.getRole().name()
-                : "ROLE_USER"; // null 대비 기본 USER
+                : "ROLE_USER"; // 기본 USER 역할
 
         return List.of(new SimpleGrantedAuthority(roleName));
     }
@@ -34,13 +33,20 @@ public class CustomUserDetails implements UserDetails {
         return user.getPassword();
     }
 
-    // username = email (null일 수 있으니 nickname 대체)
     @Override
     public String getUsername() {
         if (user.getEmail() != null && !user.getEmail().isBlank()) {
             return user.getEmail();
         }
-        return user.getNickname(); // fallback
+        return user.getNickname(); // 이메일 없을 시 닉네임 사용
+    }
+
+    /**
+     * @brief 현재 로그인한 유저의 고유 ID (Long 타입) 반환
+     *        컨트롤러에서 Authentication.getPrincipal()을 통해 접근 가능
+     */
+    public Long getUserId() {
+        return user.getId(); // Users 엔티티에 getId() 메서드 필요
     }
 
     @Override

@@ -16,8 +16,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity; // 메서드 보안 활성화 어노테이션 추가
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -34,11 +34,12 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@EnableMethodSecurity // @PreAuthorize 등의 어노테이션 기반 메서드 보안 활성화
 public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtTokenService jwtTokenService;
-    private final JwtFilter jwtFilter;           // 우리가 수정한 JwtFilter(@Component)
+    private final JwtFilter jwtFilter;           // JWT 인증 필터
     private final UserRepository userRepository;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final OAuth2FailureHandler oAuth2FailureHandler;
@@ -50,7 +51,7 @@ public class SecurityConfig {
     }
 
     /**
-     * DaoAuthenticationProvider + CustomUserDetailsService를 사용하는 AuthenticationManager
+     * @brief ID/PW 기반 로그인 시 사용되는 AuthenticationManager 구성
      */
     @Bean
     public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
@@ -67,54 +68,47 @@ public class SecurityConfig {
     }
 
     /**
-     * 전체 Security 필터 체인
+     * @brief 전체 Security 필터 체인 정의
+     *        CSRF 비활성화, CORS 설정, 세션 Stateless, JWT/OAuth2 필터 추가
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    AuthenticationManager authManager) throws Exception {
 
-        // 우리가 앞에서 수정한 LoginFilter (Access/Refresh 발급하는 버전)
         LoginFilter loginFilter = new LoginFilter(authManager, jwtTokenService, userRepository);
         loginFilter.setFilterProcessesUrl("/api/auth/login");
 
         http
-                // JWT 기반이니까 CSRF, formLogin, httpBasic 비활성화
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(fl -> fl.disable())
                 .httpBasic(hb -> hb.disable())
 
-                // 인증 실패 시 401 JSON 리턴
                 .exceptionHandling(eh -> eh.authenticationEntryPoint((req, res, ex) -> {
                     res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     res.setContentType("application/json;charset=UTF-8");
                     res.getWriter().write("{\"error\":\"unauthorized\"}");
                 }))
 
-                // 요청별 권한 설정
                 .authorizeHttpRequests(auth -> auth
-                        // 회원가입/로그인, 에러는 모두 허용
                         .requestMatchers(HttpMethod.POST, "/api/auth/join", "/api/auth/login","/api/auth/refresh").permitAll()
                         .requestMatchers("/error").permitAll()
 
-                        // OAuth2 관련 URL은 전부 허용
                         .requestMatchers(
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/oauth2/authorization/**"
                         ).permitAll()
 
-                        // 필요하면 나중에 이렇게 더 세분화 가능
-                        // .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        // .requestMatchers("/api/user/**").hasAuthority("USER")
+                        // S3 유저/관리자 엔드포인트는 인증만 되면 접근 허용 (세부 권한은 @PreAuthorize에서)
+                        .requestMatchers("/api/s3/user/**").authenticated()
+                        .requestMatchers("/api/s3/admin/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
 
-                // ===== OAuth2 소셜 로그인 설정 =====
                 .oauth2Login(o -> o
-                        // 프론트 /login 과 충돌 안 나게 더미 로그인 페이지 경로
                         .loginPage("/api/auth/oauth2/login")
                         .authorizationEndpoint(a -> a.baseUri("/oauth2/authorization"))
                         .redirectionEndpoint(r -> r.baseUri("/login/oauth2/code/*"))
@@ -122,12 +116,8 @@ public class SecurityConfig {
                         .failureHandler(oAuth2FailureHandler)
                 )
 
-                // ===== 필터 체인 순서 =====
-                // OAuth2 콜백 로그 찍는 필터 (선택)
                 .addFilterBefore(oAuth2LoggingFilter, UsernamePasswordAuthenticationFilter.class)
-                // JWT 인증 필터: 매 요청마다 토큰 검증
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                // 로그인 처리 필터: /api/auth/login (ID/PW)
                 .addFilterAt(loginFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
