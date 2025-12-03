@@ -39,7 +39,7 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtTokenService jwtTokenService;
-    private final JwtFilter jwtFilter;           // JWT 인증 필터
+    private final JwtFilter jwtFilter; // JWT 인증 필터
     private final UserRepository userRepository;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final OAuth2FailureHandler oAuth2FailureHandler;
@@ -55,8 +55,7 @@ public class SecurityConfig {
      */
     @Bean
     public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
-        AuthenticationManagerBuilder builder =
-                http.getSharedObject(AuthenticationManagerBuilder.class);
+        AuthenticationManagerBuilder builder = http.getSharedObject(AuthenticationManagerBuilder.class);
 
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(customUserDetailsService);
@@ -73,7 +72,7 @@ public class SecurityConfig {
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   AuthenticationManager authManager) throws Exception {
+            AuthenticationManager authManager) throws Exception {
 
         LoginFilter loginFilter = new LoginFilter(authManager, jwtTokenService, userRepository);
         loginFilter.setFilterProcessesUrl("/api/auth/login");
@@ -92,29 +91,29 @@ public class SecurityConfig {
                 }))
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/join", "/api/auth/login","/api/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/join", "/api/auth/login", "/api/auth/refresh")
+                        .permitAll()
                         .requestMatchers("/error").permitAll()
 
                         .requestMatchers(
                                 "/oauth2/**",
                                 "/login/oauth2/**",
-                                "/oauth2/authorization/**"
-                        ).permitAll()
+                                "/oauth2/authorization/**",
+                                "/api/category-versions/**")
+                        .permitAll()
 
                         // S3 유저/관리자 엔드포인트는 인증만 되면 접근 허용 (세부 권한은 @PreAuthorize에서)
                         .requestMatchers("/api/s3/user/**").authenticated()
                         .requestMatchers("/api/s3/admin/**").authenticated()
 
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
 
                 .oauth2Login(o -> o
                         .loginPage("/api/auth/oauth2/login")
                         .authorizationEndpoint(a -> a.baseUri("/oauth2/authorization"))
                         .redirectionEndpoint(r -> r.baseUri("/login/oauth2/code/*"))
                         .successHandler(oAuth2SuccessHandler)
-                        .failureHandler(oAuth2FailureHandler)
-                )
+                        .failureHandler(oAuth2FailureHandler))
 
                 .addFilterBefore(oAuth2LoggingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
@@ -136,6 +135,3 @@ public class SecurityConfig {
         return source;
     }
 }
-
-
-

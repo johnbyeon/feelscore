@@ -10,4 +10,6 @@ public interface CategoryVersionRepository extends JpaRepository<CategoryVersion
 
     @Query("SELECT MAX(cv.version) FROM CategoryVersion cv")
     Optional<Long> findMaxVersion();
+
+    Optional<CategoryVersion> findTopByOrderByVersionDesc();
 }

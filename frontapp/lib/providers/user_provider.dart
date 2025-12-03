@@ -35,6 +35,7 @@ class UserProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('userId', _userId!);
       await prefs.setString('nickname', _nickname!);
+      await prefs.setString('accessToken', data['access_token']);
 
       notifyListeners();
     } catch (e) {

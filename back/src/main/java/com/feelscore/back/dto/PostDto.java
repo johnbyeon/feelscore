@@ -9,8 +9,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
@@ -29,11 +27,14 @@ public class PostDto {
         @NotNull(message = "카테고리를 선택해주세요")
         private Long categoryId;
 
+        private String imageUrl; // 이미지 키 추가
+
         public Post toEntity(Users users, Category category) {
             return Post.builder()
                     .content(content)
                     .users(users)
                     .category(category)
+                    .imageUrl(imageUrl)
                     .build();
         }
     }
@@ -62,6 +63,7 @@ public class PostDto {
         private String blindReason;
         private UsersDto.SimpleResponse user;
         private CategoryDto.SimpleResponse category;
+        private String imageUrl;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
@@ -73,6 +75,7 @@ public class PostDto {
                     .blindReason(post.getBlindReason())
                     .user(UsersDto.SimpleResponse.from(post.getUsers()))
                     .category(CategoryDto.SimpleResponse.from(post.getCategory()))
+                    .imageUrl(post.getImageUrl())
                     .createdAt(post.getCreatedAt())
                     .updatedAt(post.getUpdatedAt())
                     .build();
@@ -90,6 +93,7 @@ public class PostDto {
         private PostStatus status;
         private String userNickname;
         private String categoryName;
+        private String imageUrl;
         private LocalDateTime createdAt;
 
         public static ListResponse from(Post post) {
@@ -99,6 +103,7 @@ public class PostDto {
                     .status(post.getStatus())
                     .userNickname(post.getUsers().getNickname())
                     .categoryName(post.getCategory().getName())
+                    .imageUrl(post.getImageUrl())
                     .createdAt(post.getCreatedAt())
                     .build();
         }

@@ -99,13 +99,14 @@ class _HomePageState extends State<HomePage> {
                               decoration: BoxDecoration(
                                 color: _getScoreColor(
                                   category.totalScore,
-                                ).withOpacity(0.2),
+                                ).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 '${category.totalScore}',
                                 style: TextStyle(
-                                  color: _getScoreColor(category.totalScore),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.6),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

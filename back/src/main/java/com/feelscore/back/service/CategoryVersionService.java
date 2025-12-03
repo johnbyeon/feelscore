@@ -66,6 +66,15 @@ public class CategoryVersionService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 최신 버전 정보 조회
+     */
+    public CategoryVersionDto getLatestVersion() {
+        return categoryVersionRepository.findTopByOrderByVersionDesc()
+                .map(CategoryVersionDto::from)
+                .orElseThrow(() -> new IllegalArgumentException("생성된 버전이 없습니다."));
+    }
+
     // DTO for Version List
     @lombok.Getter
     @lombok.Builder

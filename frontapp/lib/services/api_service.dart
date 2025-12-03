@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
@@ -42,6 +43,139 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       throw Exception('Failed to signup: ${response.body}');
+    }
+  }
+
+  Future<Map<String, String>> getUploadPresignedUrl(
+    String originalFileName,
+    String contentType,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse(
+      '$baseUrl/s3/user/upload-presigned?originalFileName=$originalFileName&contentType=$contentType',
+    );
+    final response = await http.post(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = jsonDecode(response.body);
+      return {
+        'presignedUrl': data['presignedUrl'],
+        'objectKey': data['objectKey'],
+      };
+    } else {
+      throw Exception('Failed to get presigned URL: ${response.body}');
+    }
+  }
+
+  Future<void> uploadFileToS3(
+    String presignedUrl,
+    XFile file,
+    String contentType,
+  ) async {
+    final response = await http.put(
+      Uri.parse(presignedUrl),
+      headers: {'Content-Type': contentType},
+      body: await file.readAsBytes(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to upload file to S3: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> createPost(
+    String content,
+    int categoryId, {
+    String? imageUrl,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/v1/posts');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'content': content,
+        'categoryId': categoryId,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to create post: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getLatestCategoryVersion() async {
+    final url = Uri.parse('$baseUrl/category-versions/latest');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception(
+        'Failed to get latest category version: ${response.body}',
+      );
+    }
+  }
+
+  Future<List<dynamic>> getCategoriesByVersion(int version) async {
+    final url = Uri.parse('$baseUrl/category-versions/$version/categories');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get categories by version: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getPostsByUser(
+    String userId, {
+    int page = 0,
+    int size = 10,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse(
+      '$baseUrl/v1/posts/user/$userId?page=$page&size=$size',
+    );
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get posts by user: ${response.body}');
     }
   }
 }

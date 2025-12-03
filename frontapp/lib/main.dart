@@ -25,7 +25,6 @@ class MyApp extends StatelessWidget {
           seedColor: const Color(0xFFD0BCFF),
           brightness: Brightness.dark,
           surface: const Color(0xFF1E1E1E),
-          background: const Color(0xFF121212),
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFF121212),
@@ -74,12 +73,13 @@ class MyApp extends StatelessWidget {
           ),
         ),
         navigationBarTheme: NavigationBarThemeData(
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
           backgroundColor: const Color(0xFF1E1E1E),
           indicatorColor: const Color(0xFF4F378B),
-          iconTheme: MaterialStateProperty.all(
+          iconTheme: WidgetStateProperty.all(
             const IconThemeData(color: Color(0xFFE6E1E5)),
           ),
-          labelTextStyle: MaterialStateProperty.all(
+          labelTextStyle: WidgetStateProperty.all(
             const TextStyle(color: Color(0xFFE6E1E5)),
           ),
         ),
@@ -101,10 +101,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
     // Check login status when app starts
-    Future.microtask(
-      () =>
-          Provider.of<UserProvider>(context, listen: false).checkLoginStatus(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<UserProvider>(context, listen: false).checkLoginStatus();
+      }
+    });
   }
 
   @override

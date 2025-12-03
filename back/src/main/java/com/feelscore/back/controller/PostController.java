@@ -12,6 +12,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import com.feelscore.back.security.CustomUserDetails;
 
 import static com.feelscore.back.dto.PostDto.*;
 
@@ -34,8 +36,9 @@ public class PostController {
     @PostMapping
     public ResponseEntity<Response> createPost(
             @RequestBody @Valid CreateRequest request,
-            @RequestParam Long userId) {
-        Response response = postService.createPost(request, userId);
+            Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Response response = postService.createPost(request, userDetails.getUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -100,8 +103,9 @@ public class PostController {
     public ResponseEntity<Response> updatePost(
             @PathVariable Long postId,
             @RequestBody @Valid UpdateRequest request,
-            @RequestParam Long userId) {
-        Response response = postService.updatePost(postId, request, userId);
+            Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Response response = postService.updatePost(postId, request, userDetails.getUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -116,8 +120,9 @@ public class PostController {
     @DeleteMapping("/{postId}")
     public ResponseEntity<Void> deletePost(
             @PathVariable Long postId,
-            @RequestParam Long userId) {
-        postService.deletePost(postId, userId);
+            Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        postService.deletePost(postId, userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
 }

@@ -13,9 +13,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
+  late final List<Widget> _pages = [
     const HomePage(),
-    const WritePage(),
+    WritePage(onPostSuccess: () => _onItemTapped(0)),
     const HistoryPage(),
     const Center(child: Text('Profile')), // Placeholder for Profile
   ];

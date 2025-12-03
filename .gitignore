@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# IntelliJ / JetBrains
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Node / NPM
+node_modules/
+npm-debug.log
+
+# Sensitive Files (Backend)
+back/src/main/resources/application.yml
+back/src/main/resources/application-*.yml
+
+# Build Directories
+back/build/
+back/.gradle/
+back/bin/
+frontapp/build/
+frontapp/.dart_tool/
+frontapp/.pub-cache/
+frontapp/.pub/

@@ -18,11 +18,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class S3Config {
 
-    // AWS Access Key ID 주입 (application.yml의 spring.cloud.aws.credentials.access-key 사용)
+    // AWS Access Key ID 주입 (application.yml의
+    // spring.cloud.aws.credentials.access-key 사용)
     @Value("${spring.cloud.aws.credentials.access-key}")
     private String accessKey;
 
-    // AWS Secret Access Key 주입 (application.yml의 spring.cloud.aws.credentials.secret-key 사용)
+    // AWS Secret Access Key 주입 (application.yml의
+    // spring.cloud.aws.credentials.secret-key 사용)
     @Value("${spring.cloud.aws.credentials.secret-key}")
     private String secretKey;
 
@@ -38,7 +40,8 @@ public class S3Config {
     public AmazonS3 amazonS3() {
         // 주입받은 AWS 자격 증명 값을 로그로 출력하여 확인 (디버깅용)
         log.info("S3Config: Initializing AmazonS3 client.");
-        log.info("S3Config: AWS Access Key ID (first 4 chars): {}", accessKey != null && accessKey.length() >= 4 ? accessKey.substring(0, 4) : "N/A");
+        log.info("S3Config: AWS Access Key ID (first 4 chars): {}",
+                accessKey != null && accessKey.length() >= 4 ? accessKey.substring(0, 4) : "N/A");
         log.info("S3Config: AWS Secret Access Key is set: {}", secretKey != null && !secretKey.isEmpty());
         log.info("S3Config: AWS Region: {}", region);
 

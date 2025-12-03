@@ -35,11 +35,15 @@ public class Post extends BaseTimeEntity {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @Column(name = "image_url")
+    private String imageUrl; // S3 Object Key
+
     @Builder
-    public Post(String content, Users users, Category category) {
+    public Post(String content, Users users, Category category, String imageUrl) {
         this.content = content;
         this.users = users;
         this.category = category;
+        this.imageUrl = imageUrl;
         this.status = PostStatus.NORMAL;
     }
 
