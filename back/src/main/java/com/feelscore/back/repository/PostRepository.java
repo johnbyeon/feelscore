@@ -20,10 +20,15 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // 특정 카테고리의 정상 게시글만 조회
     Page<Post> findByCategory_IdAndStatus(Long categoryId, PostStatus status, Pageable pageable);
 
-    // 특정 사용자의 게시글 목록 조회
+    // 특정 사용자의 게시글 목록 조회 (감정 분석 결과 포함)
+    @Query("SELECT p, pe.dominantEmotion FROM Post p LEFT JOIN PostEmotion pe ON p.id = pe.post.id WHERE p.users.id = :userId AND p.status = :status")
+    Page<Object[]> findByUsers_IdAndStatusWithEmotion(@Param("userId") Long userId, @Param("status") PostStatus status,
+            Pageable pageable);
+
+    // 특정 사용자의 게시글 목록 조회 (기존 메서드 유지)
     Page<Post> findByUsers_Id(Long userId, Pageable pageable);
 
-    // 특정 사용자의 정상 게시글만 조회
+    // 특정 사용자의 정상 게시글만 조회 (기존 메서드 유지)
     Page<Post> findByUsers_IdAndStatus(Long userId, PostStatus status, Pageable pageable);
 
     // 게시글과 작성자 정보 함께 조회 (Fetch Join)

@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'services/api_service.dart';
 import 'services/category_service.dart';
+import 'package:provider/provider.dart';
+import 'providers/refresh_provider.dart';
 
 class WritePage extends StatefulWidget {
   final VoidCallback? onPostSuccess;
@@ -353,6 +355,11 @@ class _WritePageState extends State<WritePage> {
                               _selectedImage = null;
                               _selectedCategoryId = null;
                             });
+
+                            // Trigger history refresh
+                            context
+                                .read<RefreshProvider>()
+                                .triggerRefreshHistory();
 
                             // Navigate to Home
                             widget.onPostSuccess?.call();

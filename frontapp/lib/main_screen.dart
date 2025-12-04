@@ -3,6 +3,9 @@ import 'write_page.dart';
 import 'history_page.dart';
 import 'home_page.dart';
 
+import 'package:provider/provider.dart';
+import 'providers/refresh_provider.dart';
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -21,6 +24,10 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   void _onItemTapped(int index) {
+    if (index == 2) {
+      // History 탭 선택 시 새로고침 트리거
+      context.read<RefreshProvider>().triggerRefreshHistory();
+    }
     setState(() {
       _selectedIndex = index;
     });

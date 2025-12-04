@@ -85,7 +85,12 @@ logging:
   level:
     org.springframework.security: DEBUG
     com.my.jwt: DEBUG
-
+    
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 # ===== prod =====
 ---
 spring:

@@ -95,6 +95,7 @@ public class PostDto {
         private String categoryName;
         private String imageUrl;
         private LocalDateTime createdAt;
+        private String dominantEmotion; // 감정 분석 결과 추가
 
         public static ListResponse from(Post post) {
             return ListResponse.builder()
@@ -105,6 +106,20 @@ public class PostDto {
                     .categoryName(post.getCategory().getName())
                     .imageUrl(post.getImageUrl())
                     .createdAt(post.getCreatedAt())
+                    .build();
+        }
+
+        // 감정 포함 생성자/메서드 추가
+        public static ListResponse from(Post post, String dominantEmotion) {
+            return ListResponse.builder()
+                    .id(post.getId())
+                    .content(post.getContent())
+                    .status(post.getStatus())
+                    .userNickname(post.getUsers().getNickname())
+                    .categoryName(post.getCategory().getName())
+                    .imageUrl(post.getImageUrl())
+                    .createdAt(post.getCreatedAt())
+                    .dominantEmotion(dominantEmotion)
                     .build();
         }
     }

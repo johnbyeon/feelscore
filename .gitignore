@@ -20,8 +20,7 @@ node_modules/
 npm-debug.log
 
 # Sensitive Files (Backend)
-back/src/main/resources/application.yml
-back/src/main/resources/application-*.yml
+
 
 # Build Directories
 back/build/
@@ -31,3 +30,9 @@ frontapp/build/
 frontapp/.dart_tool/
 frontapp/.pub-cache/
 frontapp/.pub/
+
+# Python / AI Server
+Evaluate/.venv/
+Evaluate/__pycache__/
+*.pyc
+.env
