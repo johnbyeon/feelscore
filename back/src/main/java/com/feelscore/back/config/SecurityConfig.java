@@ -1,7 +1,7 @@
 package com.feelscore.back.config;
 
 import com.feelscore.back.myjwt.JwtTokenService;
-import com.feelscore.back.myjwt.LoginFilter;
+
 import com.feelscore.back.oauth2.OAuth2FailureHandler;
 import com.feelscore.back.oauth2.OAuth2LoggingFilter;
 import com.feelscore.back.oauth2.OAuth2SuccessHandler;
@@ -74,9 +74,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             AuthenticationManager authManager) throws Exception {
 
-        LoginFilter loginFilter = new LoginFilter(authManager, jwtTokenService, userRepository);
-        loginFilter.setFilterProcessesUrl("/api/auth/login");
-
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -116,8 +113,7 @@ public class SecurityConfig {
                         .failureHandler(oAuth2FailureHandler))
 
                 .addFilterBefore(oAuth2LoggingFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAt(loginFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -19,9 +18,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * @brief 매 요청마다 JWT를 검사하여 SecurityContext에 인증 정보를 넣어주는 필터.
- *        - 유효한 JWT 토큰일 경우 CustomUserDetailsService를 통해 UserDetails(CustomUserDetails)를 로드하여
- *          SecurityContext에 인증 정보를 설정합니다.
+ * 매 요청마다 JWT를 검사해서 SecurityContext에 인증 정보를 넣어주는 필터
  */
 @Slf4j
 @Component
@@ -29,15 +26,15 @@ import java.util.List;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtTokenService jwtTokenService;
-    private final CustomUserDetailsService customUserDetailsService; // CustomUserDetailsService 주입 추가
+    private final CustomUserDetailsService customUserDetailsService;
 
-    // JWT 검사 예외(화이트리스트) 경로
+    // JWT 검사 안 하는(화이트리스트) 경로
     private static final List<String> WHITE_LIST = List.of(
             "/api/auth/join",
             "/api/auth/login",
             "/api/auth/refresh",
             "/error",
-            "/oauth2/", // OAuth2 관련 경로는 필터에서도 건너뛰도록 추가
+            "/oauth2/",
             "/login/oauth2/"
     );
 
@@ -54,44 +51,54 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String path = request.getServletPath();
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        // 1) 토큰이 없거나 "Bearer "로 시작하지 않으면 다음 필터로
+        log.debug("[JwtFilter] path={}, authHeader={}", path, authHeader);
+
+        // 1) 토큰이 없거나 "Bearer " 로 시작하지 않으면 그냥 다음 필터로
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7); // "Bearer " 이후 토큰 추출
+        String token = authHeader.substring(7); // "Bearer " 이후 부분이 실제 토큰
 
-        // 2) 만료 혹은 잘못된 토큰이면 그냥 통과 (컨트롤러에서 401 처리 가능)
-        if (jwtTokenService.isExpired(token)) {
-            log.warn("만료되었거나 유효하지 않은 JWT 토큰입니다. (token: {})", token);
-            filterChain.doFilter(request, response);
-            return;
+        try {
+            // 2) 만료된 토큰이면 패스
+            if (jwtTokenService.isExpired(token)) {
+                log.warn("[JwtFilter] 만료된 JWT 토큰입니다. token={}", token);
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // 3) 토큰에서 이메일 꺼내기 (로그인/리프레시랑 같은 메서드 사용!)
+            String email = jwtTokenService.extractEmail(token);
+
+            // 이미 인증된 상태가 아니고, email 이 있으면 인증 객체 세팅
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.debug("[JwtFilter] JWT 인증 성공: email={}, roles={}",
+                        email, userDetails.getAuthorities());
+            }
+
+        } catch (Exception e) {
+            // JWT 파싱/검증 중 예외 나면 인증 없이 넘기고, 로그만 남김
+            log.warn("[JwtFilter] JWT 처리 중 예외 발생: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
         }
 
-        // 3) 토큰에서 이메일 추출 및 SecurityContext에 인증 정보가 없는 경우에만 처리
-        String email = jwtTokenService.extractEmail(token);
-
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // CustomUserDetailsService를 통해 UserDetails(CustomUserDetails) 로드
-            UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
-
-            // 로드된 UserDetails를 사용하여 Authentication 객체 생성
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,    // principal을 CustomUserDetails로 설정
-                            null,           // credentials (JWT에서는 필요 없음)
-                            userDetails.getAuthorities() // CustomUserDetails에서 가져온 권한 사용
-                    );
-
-            // SecurityContextHolder에 Authentication 객체 설정
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.debug("JWT 인증 성공: email={}, roles={}", email, userDetails.getAuthorities());
-        }
-
-        // 4) 다음 필터로
+        // 4) 다음 필터로 넘기기
         filterChain.doFilter(request, response);
     }
 }

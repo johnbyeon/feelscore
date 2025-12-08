@@ -1,7 +1,7 @@
 package com.feelscore.back.controller;
 
-import com.feelscore.back.entity.Users;
 import com.feelscore.back.entity.Role;
+import com.feelscore.back.entity.Users;
 import com.feelscore.back.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/user")
@@ -18,8 +20,15 @@ public class UserController {
 
     private final UserRepository userRepository;
 
-    /** 내 정보 조회 (JWT 필요) */
-    @GetMapping("/me")
+    /**
+     * 내 정보 조회 (JWT 필요)
+     *
+     * GET  /api/user/me
+     * POST /api/user/me
+     *
+     * Header: Authorization: Bearer {accessToken}
+     */
+    @RequestMapping(value = "/me", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<UserMeResponse> getMyInfo(Authentication authentication) {
 
         // LoginFilter + CustomUserDetails 에서 넣어준 username(email)

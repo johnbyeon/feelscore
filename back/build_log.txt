@@ -1,0 +1,49 @@
+
+> Task :compileJava FAILED
+C:\hyunsik\feelscore\back\src\main\java\com\feelscore\back\service\DmService.java:63: error: cannot find symbol
+        DmThread thread = DmThread.create();
+                                  ^
+  symbol:   method create()
+  location: class DmThread
+C:\hyunsik\feelscore\back\src\main\java\com\feelscore\back\service\DmService.java:87: error: cannot find symbol
+        DmThreadMember senderMember = DmThreadMember.create(thread, sender, senderState, senderFolder);
+                                                    ^
+  symbol:   method create(DmThread,Users,DmMemberState,DmFolder)
+  location: class DmThreadMember
+C:\hyunsik\feelscore\back\src\main\java\com\feelscore\back\service\DmService.java:88: error: cannot find symbol
+        DmThreadMember receiverMember = DmThreadMember.create(thread, receiver, receiverState, receiverFolder);
+                                                      ^
+  symbol:   method create(DmThread,Users,DmMemberState,DmFolder)
+  location: class DmThreadMember
+3 errors
+
+[Incubating] Problems report is available at: file:///C:/hyunsik/feelscore/back/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler output below.
+  C:\hyunsik\feelscore\back\src\main\java\com\feelscore\back\service\DmService.java:63: error: cannot find symbol
+          DmThread thread = DmThread.create();
+                                    ^
+    symbol:   method create()
+    location: class DmThread
+  C:\hyunsik\feelscore\back\src\main\java\com\feelscore\back\service\DmService.java:87: error: cannot find symbol
+          DmThreadMember senderMember = DmThreadMember.create(thread, sender, senderState, senderFolder);
+                                                      ^
+    symbol:   method create(DmThread,Users,DmMemberState,DmFolder)
+    location: class DmThreadMember
+  C:\hyunsik\feelscore\back\src\main\java\com\feelscore\back\service\DmService.java:88: error: cannot find symbol
+          DmThreadMember receiverMember = DmThreadMember.create(thread, receiver, receiverState, receiverFolder);
+                                                        ^
+    symbol:   method create(DmThread,Users,DmMemberState,DmFolder)
+    location: class DmThreadMember
+  3 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to generate a Build Scan (powered by Develocity).
+
+BUILD FAILED in 2s
+1 actionable task: 1 executed
