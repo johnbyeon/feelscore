@@ -31,6 +31,9 @@ public class Users extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private Role role; // USER, ADMIN
 
+    @Column(length = 500)
+    private String fcmToken; // 🔹 FCM 토큰 저장용 (추가됨)
+
     private LocalDateTime lastLoginAt; // 마지막 접속일 (별도 관리)
 
     @Builder
@@ -55,5 +58,17 @@ public class Users extends BaseTimeEntity {
      */
     public void updateRole(Role newRole) {
         this.role = newRole;
+    }
+
+    /**
+     * @brief FCM 토큰을 업데이트합니다.
+     * @param fcmToken 새로 발급된 FCM 토큰
+     */
+    public void updateFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

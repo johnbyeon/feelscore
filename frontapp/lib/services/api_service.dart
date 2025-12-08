@@ -2,10 +2,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 class ApiService {
   // Android Emulator: 10.0.2.2, iOS Simulator: 127.0.0.1
-  static const String baseUrl = 'http://127.0.0.1:8080/api';
+  // static const String baseUrl = 'http://127.0.0.1:8080/api';
+  
+  static String get baseUrl {
+    if (kIsWeb) return 'http://localhost:8080/api';
+    if (Platform.isAndroid) return 'http://10.0.2.2:8080/api';
+    return 'http://127.0.0.1:8080/api';
+  }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final url = Uri.parse('$baseUrl/auth/login');
@@ -176,6 +184,29 @@ class ApiService {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
       throw Exception('Failed to get posts by user: ${response.body}');
+    }
+  }
+
+  Future<void> updateFcmToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    final accessToken = prefs.getString('accessToken');
+
+    if (accessToken == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/user/fcm-token');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({'token': token}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update FCM token: ${response.body}');
     }
   }
 }

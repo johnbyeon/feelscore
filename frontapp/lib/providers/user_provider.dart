@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // import 추가
+import 'package:flutter/foundation.dart'; // kDebugMode import 추가
 
 class UserProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -36,6 +38,21 @@ class UserProvider with ChangeNotifier {
       await prefs.setString('userId', _userId!);
       await prefs.setString('nickname', _nickname!);
       await prefs.setString('accessToken', data['access_token']);
+
+      // 🔹 로그인 성공 후 FCM 토큰 서버로 전송
+      try {
+        final fcmToken = await FirebaseMessaging.instance.getToken();
+        if (fcmToken != null) {
+          await _apiService.updateFcmToken(fcmToken);
+          if (kDebugMode) {
+            print('FCM Token updated on server: $fcmToken');
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Failed to update FCM token: $e');
+        }
+      }
 
       notifyListeners();
     } catch (e) {

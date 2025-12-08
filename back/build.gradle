@@ -41,6 +41,8 @@ dependencies {
 
     // ☁️ AWS SDK for S3 추가
     implementation 'com.amazonaws:aws-java-sdk-s3:1.12.720' // AWS SDK v1 S3 모듈
+    implementation 'com.google.firebase:firebase-admin:9.2.0' // Firebase Admin SDK
+    // Refresh Gradle dependencies
 
     annotationProcessor 'org.projectlombok:lombok'
 
