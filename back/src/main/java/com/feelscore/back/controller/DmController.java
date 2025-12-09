@@ -10,6 +10,10 @@ import com.feelscore.back.service.DmService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,7 +29,7 @@ public class DmController {
     @PostMapping("/message")
     public ResponseEntity<DmMessageResponse> sendMessage(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody DmSendMessageRequest request) {
+            @jakarta.validation.Valid @RequestBody DmSendMessageRequest request) {
         DmMessage message = dmService.sendMessage(
                 userDetails.getUserId(),
                 request.getReceiverId(),
@@ -74,7 +78,7 @@ public class DmController {
         return ResponseEntity.ok().build();
     }
 
-    // 6. 쓰레드 숨기기 (나가기)
+    // 6. 쓰레드 숨기기 (내 화면에서 잠시 안보이게)
     @PostMapping("/threads/{threadId}/hide")
     public ResponseEntity<Void> hideThread(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -83,16 +87,29 @@ public class DmController {
         return ResponseEntity.ok().build();
     }
 
-    // 7. 메시지 목록 조회
-    @GetMapping("/threads/{threadId}/messages")
-    public ResponseEntity<List<DmMessageResponse>> getMessages(
+    // 8. 쓰레드 나가기 (아예 삭제)
+    @DeleteMapping("/threads/{threadId}/leave")
+    public ResponseEntity<Void> leaveThread(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long threadId) {
+        dmService.leaveThread(userDetails.getUserId(), threadId);
+        return ResponseEntity.ok().build();
+    }
+
+    // 7. 메시지 목록 조회 (페이징 적용)
+    @GetMapping("/threads/{threadId}/messages")
+    public ResponseEntity<Page<DmMessageResponse>> getMessages(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long threadId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+
         // TODO: 보안상 이 유저가 이 쓰레드에 속해있는지 체크하는 로직이 Service나 여기서 필요할 수 있음.
-        List<DmMessage> messages = dmService.loadMessages(threadId);
-        List<DmMessageResponse> dtos = messages.stream()
-                .map(msg -> new DmMessageResponse(msg, userDetails.getUserId()))
-                .toList();
+        // -> Service에서 체크하도록 변경됨.
+
+        Page<DmMessage> messages = dmService.loadMessages(threadId, pageable, userDetails.getUserId());
+
+        Page<DmMessageResponse> dtos = messages.map(msg -> new DmMessageResponse(msg, userDetails.getUserId()));
+
         return ResponseEntity.ok(dtos);
     }
 }

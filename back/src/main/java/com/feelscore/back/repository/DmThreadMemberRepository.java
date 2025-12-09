@@ -29,4 +29,9 @@ public interface DmThreadMemberRepository extends JpaRepository<DmThreadMember, 
      * thread + user 조합으로 한 row 찾기 (상태 업데이트용)
      */
     Optional<DmThreadMember> findByThreadIdAndUserId(Long threadId, Long userId);
+
+    /**
+     * 해당 쓰레드에 유저가 참여중인지 확인 (권한 체크용)
+     */
+    boolean existsByThreadIdAndUserId(Long threadId, Long userId);
 }

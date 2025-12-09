@@ -24,5 +24,6 @@ public class DmSendMessageRequest {
     /**
      * 메시지 내용
      */
+    @jakarta.validation.constraints.NotBlank(message = "메시지 내용은 필수입니다.")
     private String content;
 }

@@ -6,14 +6,16 @@ import com.feelscore.back.entity.DmMessage;
 import com.feelscore.back.entity.DmThread;
 import com.feelscore.back.entity.DmThreadMember;
 import com.feelscore.back.entity.Users;
+import com.feelscore.back.repository.BlockRepository;
 import com.feelscore.back.repository.DmMessageRepository;
 import com.feelscore.back.repository.DmThreadMemberRepository;
 import com.feelscore.back.repository.DmThreadRepository;
-import com.feelscore.back.repository.BlockRepository;
 import com.feelscore.back.repository.FollowRepository;
 import com.feelscore.back.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ public class DmService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final BlockRepository blockRepository;
+    private final NotificationService notificationService;
 
     /**
      * DM 메시지 보내기
@@ -43,28 +46,38 @@ public class DmService {
             throw new IllegalArgumentException("자기 자신에게 DM을 보낼 수 없습니다.");
         }
 
+        // 발신자 조회
         Users sender = findUser(senderId);
 
-        // 수신자가 발신자를 차단했는지 확인
+        // 수신자 미리 조회 (변수 재활용을 위해)
+        Users receiver = null;
         if (receiverId != null) {
-            Users receiverUser = findUser(receiverId);
-            if (blockRepository.existsByBlockerAndBlocked(receiverUser, sender)) {
+            receiver = findUser(receiverId);
+
+            // 차단 여부 확인 (원래대로 IllegalStateException 사용)
+            if (blockRepository.existsByBlockerAndBlocked(receiver, sender)) {
                 throw new IllegalStateException("상대방이 당신을 차단하여 메시지를 보낼 수 없습니다.");
             }
         }
+
         DmThread thread;
 
         if (threadId != null) {
-            // 기존 thread 사용
+            // 1) 기존 thread 사용
             thread = dmThreadRepository.findById(threadId)
                     .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 쓰레드입니다."));
-            // TODO: sender가 이 thread의 멤버인지 검증하는 로직 필요
+
+            // 2) 발신자가 이 thread의 멤버인지 권한 체크
+            boolean isMember = dmThreadMemberRepository.existsByThreadIdAndUserId(threadId, senderId);
+            if (!isMember) {
+                throw new IllegalArgumentException("해당 대화방에 접근 권한이 없습니다.");
+            }
+
         } else {
             // threadId가 없으면 receiverId로 1:1 쓰레드 찾거나 생성
-            if (receiverId == null) {
+            if (receiverId == null || receiver == null) {
                 throw new IllegalArgumentException("receiverId 또는 threadId 중 하나는 필수입니다.");
             }
-            Users receiver = findUser(receiverId);
 
             // 1) 기존 쓰레드 있는지 먼저 확인
             thread = dmThreadRepository
@@ -94,6 +107,18 @@ public class DmService {
                 .orElseThrow(() -> new EntityNotFoundException("DM 멤버 정보를 찾을 수 없습니다."));
 
         senderMember.updateLastRead(message);
+
+        // 수신자에게 알림 생성 (수신자가 존재하고, 나 자신에게 보낸게 아닐 때)
+        if (receiver != null && !senderId.equals(receiverId)) {
+
+            String notiMessage = String.format("%s님이 메시지를 보냈습니다.", sender.getNickname());
+
+            notificationService.createNotification(
+                    receiver,
+                    "DM",
+                    notiMessage,
+                    "/dm/" + thread.getId());
+        }
 
         return message;
     }
@@ -213,11 +238,42 @@ public class DmService {
     }
 
     /**
-     * 특정 쓰레드 메시지 전체 불러오기
+     * DM 쓰레드 완전히 나가기 (멤버 삭제)
+     */
+    public void leaveThread(Long userId, Long threadId) {
+        DmThreadMember me = dmThreadMemberRepository
+                .findByThreadIdAndUserId(threadId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("DM 멤버 정보를 찾을 수 없습니다."));
+
+        dmThreadMemberRepository.delete(me);
+
+        // (선택사항) 쓰레드에 남은 멤버가 없으면 쓰레드 자체를 삭제하는 로직 추가 가능
+        // int remaining = dmThreadMemberRepository.countByThreadId(threadId); // 예시
+    }
+
+    /**
+     * 특정 쓰레드 메시지 전체 불러오기 (Legacy)
      */
     @Transactional(readOnly = true)
     public List<DmMessage> loadMessages(Long threadId) {
         return dmMessageRepository.findByThreadIdOrderByCreatedAtAsc(threadId);
+    }
+
+    /**
+     * 특정 쓰레드 메시지 페이징 불러오기
+     * - Pageable을 통해 offset, limit 처리
+     * - 접근 권한 체크 추가
+     */
+    @Transactional(readOnly = true)
+    public Page<DmMessage> loadMessages(Long threadId, Pageable pageable, Long userId) {
+        // 권한 체크: 사용자가 해당 쓰레드의 멤버인지 확인
+        boolean isMember = dmThreadMemberRepository.existsByThreadIdAndUserId(threadId, userId);
+        if (!isMember) {
+            throw new IllegalArgumentException("해당 대화방에 접근 권한이 없습니다.");
+        }
+
+        // TODO: 향후 퍼포먼스 이슈 시 NoOffset 방식(lastMessageId 기반) 고려 가능
+        return dmMessageRepository.findByThreadIdOrderByCreatedAtAsc(threadId, pageable);
     }
 
     // ======================
