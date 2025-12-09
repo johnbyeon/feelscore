@@ -67,6 +67,26 @@ public class PostDto {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
+        private Long commentCount;
+        private java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts;
+
+        public static Response from(Post post, Long commentCount,
+                java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts) {
+            return Response.builder()
+                    .id(post.getId())
+                    .content(post.getContent())
+                    .status(post.getStatus())
+                    .blindReason(post.getBlindReason())
+                    .user(UsersDto.SimpleResponse.from(post.getUsers()))
+                    .category(CategoryDto.SimpleResponse.from(post.getCategory()))
+                    .imageUrl(post.getImageUrl())
+                    .createdAt(post.getCreatedAt())
+                    .updatedAt(post.getUpdatedAt())
+                    .commentCount(commentCount)
+                    .reactionCounts(reactionCounts)
+                    .build();
+        }
+
         public static Response from(Post post) {
             return Response.builder()
                     .id(post.getId())
@@ -78,6 +98,8 @@ public class PostDto {
                     .imageUrl(post.getImageUrl())
                     .createdAt(post.getCreatedAt())
                     .updatedAt(post.getUpdatedAt())
+                    .commentCount(0L)
+                    .reactionCounts(new java.util.HashMap<>())
                     .build();
         }
     }
@@ -99,11 +121,10 @@ public class PostDto {
         private LocalDateTime createdAt;
         private String dominantEmotion; // 감정 분석 결과 추가
 
-        private Long viewCount;
         private Long commentCount;
         private java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts;
 
-        public static ListResponse from(Post post, String dominantEmotion, Long viewCount, Long commentCount,
+        public static ListResponse from(Post post, String dominantEmotion, Long commentCount,
                 java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts) {
             return ListResponse.builder()
                     .id(post.getId())
@@ -116,7 +137,6 @@ public class PostDto {
                     .imageUrl(post.getImageUrl())
                     .createdAt(post.getCreatedAt())
                     .dominantEmotion(dominantEmotion)
-                    .viewCount(viewCount)
                     .commentCount(commentCount)
                     .reactionCounts(reactionCounts)
                     .build();

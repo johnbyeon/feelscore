@@ -2,7 +2,6 @@ package com.feelscore.back.controller;
 
 import com.feelscore.back.dto.PostDto;
 import com.feelscore.back.service.PostService;
-import com.feelscore.back.service.PostViewService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +22,6 @@ import static com.feelscore.back.dto.PostDto.*;
 public class PostController {
 
     private final PostService postService;
-    private final PostViewService postViewService;
 
     /**
      * 게시글 생성
@@ -51,10 +49,7 @@ public class PostController {
      */
     @GetMapping("/{postId}")
     public ResponseEntity<PostDto.Response> getPostById(@PathVariable Long postId,
-            @RequestParam(required = false) Long userId,
-            HttpServletRequest request) {
-        String ipAddress = request.getRemoteAddr();
-        postViewService.increaseViewCount(postId, userId, ipAddress);
+            @RequestParam(required = false) Long userId) {
         return ResponseEntity.ok(postService.getPostById(postId));
     }
 

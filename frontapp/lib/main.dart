@@ -19,11 +19,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  
-  // Initialize FCM Service
-  await FCMService().initialize();
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Initialize FCM Service
+    await FCMService().initialize();
+  } catch (e) {
+    print("Failed to initialize Firebase: $e");
+    // Continue app execution even if Firebase fails
+  }
 
   runApp(
     MultiProvider(

@@ -31,7 +31,6 @@ public class PostService {
     private final PostAnalysisProducer postAnalysisProducer;
     private final com.feelscore.back.repository.PostReactionRepository postReactionRepository;
     private final com.feelscore.back.repository.CommentRepository commentRepository;
-    private final com.feelscore.back.repository.PostViewRepository postViewRepository;
 
     @Transactional
     public Response createPost(@Valid CreateRequest request, Long userId) {
@@ -59,7 +58,18 @@ public class PostService {
     public Response getPostById(Long postId) {
         Post post = postRepository.findByIdWithAll(postId)
                 .orElseThrow(() -> new NoSuchElementException("Post not found with id: " + postId));
-        return Response.from(post);
+
+        Long commentCount = commentRepository.countByPost(post);
+
+        List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
+        java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
+        for (Object[] row : reactionObjs) {
+            com.feelscore.back.entity.EmotionType type = (com.feelscore.back.entity.EmotionType) row[0];
+            Long count = (row[1] instanceof Number) ? ((Number) row[1]).longValue() : 0L;
+            reactionCounts.put(type, count);
+        }
+
+        return Response.from(post, commentCount, reactionCounts);
     }
 
     public Page<ListResponse> getPostsByCategory(Long categoryId, Pageable pageable) {
@@ -81,16 +91,16 @@ public class PostService {
             Post post = (Post) result[0];
             Object emotionObj = result[1];
             String emotion = (emotionObj != null) ? emotionObj.toString() : null;
-            Long viewCount = postViewRepository.countByPost(post);
             Long commentCount = commentRepository.countByPost(post);
-
             List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
             java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
             for (Object[] row : reactionObjs) {
-                reactionCounts.put((com.feelscore.back.entity.EmotionType) row[0], (Long) row[1]);
+                com.feelscore.back.entity.EmotionType type = (com.feelscore.back.entity.EmotionType) row[0];
+                Long count = (row[1] instanceof Number) ? ((Number) row[1]).longValue() : 0L;
+                reactionCounts.put(type, count);
             }
 
-            return ListResponse.from(post, emotion, viewCount, commentCount, reactionCounts);
+            return ListResponse.from(post, emotion, commentCount, reactionCounts);
         });
     }
 
@@ -100,16 +110,16 @@ public class PostService {
             Post post = (Post) result[0];
             Object emotionObj = result[1];
             String emotion = (emotionObj != null) ? emotionObj.toString() : null;
-            Long viewCount = postViewRepository.countByPost(post);
             Long commentCount = commentRepository.countByPost(post);
-
             List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
             java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
             for (Object[] row : reactionObjs) {
-                reactionCounts.put((com.feelscore.back.entity.EmotionType) row[0], (Long) row[1]);
+                com.feelscore.back.entity.EmotionType type = (com.feelscore.back.entity.EmotionType) row[0];
+                Long count = (row[1] instanceof Number) ? ((Number) row[1]).longValue() : 0L;
+                reactionCounts.put(type, count);
             }
 
-            return ListResponse.from(post, emotion, viewCount, commentCount, reactionCounts);
+            return ListResponse.from(post, emotion, commentCount, reactionCounts);
         });
     }
 

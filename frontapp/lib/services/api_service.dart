@@ -8,7 +8,7 @@ import 'dart:io';
 class ApiService {
   // Android Emulator: 10.0.2.2, iOS Simulator: 127.0.0.1
   // static const String baseUrl = 'http://127.0.0.1:8080/api';
-  
+
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:8080/api';
     if (Platform.isAndroid) return 'http://10.0.2.2:8080/api';
@@ -240,7 +240,7 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getHomeStats() async {
+  Future<List<dynamic>> getHomeStats({String period = 'ALL'}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken');
 
@@ -248,7 +248,7 @@ class ApiService {
       throw Exception('No access token found');
     }
 
-    final url = Uri.parse('$baseUrl/stats/home');
+    final url = Uri.parse('$baseUrl/stats/home?period=$period');
     final response = await http.get(
       url,
       headers: {
@@ -470,26 +470,9 @@ class ApiService {
     }
   }
 
-  Future<void> increasePostView(String postId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    final url = Uri.parse('$baseUrl/posts/$postId');
-    final headers = <String, String>{'Content-Type': 'application/json'};
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-
-    // Call GET /posts/{id} triggers view count increase in backend
-    final response = await http.get(url, headers: headers);
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to increase view count: ${response.body}');
-    }
-  }
-
   Future<void> toggleCommentReaction(
-    String commentId,
+    int postId,
+    int commentId,
     String emotionType,
   ) async {
     final prefs = await SharedPreferences.getInstance();
@@ -499,19 +482,207 @@ class ApiService {
       throw Exception('No access token found');
     }
 
-    final url = Uri.parse(
-      '$baseUrl/posts/$commentId/comments/$commentId/react',
-    ); // ERROR: Check Backend Controller path!
-    // Backend CommentController path: @RequestMapping("/api/posts/{postId}/comments")
-    // Post mapping: @PostMapping("/{commentId}/react")
-    // So full URL is /api/posts/{postId}/comments/{commentId}/react
-    // Wait, the backend logic for CommentController uses @RequestMapping("/api/posts/{postId}/comments").
-    // But toggleReaction is @PostMapping("/{commentId}/react").
-    // So path is /api/posts/{postId}/comments/{commentId}/react.
-    // I need postId in toggleCommentReaction?
-    // Let's check CommentController again.
-    // YES. @RequestMapping("/api/posts/{postId}/comments")
-    // So I need postId.
+    final url = Uri.parse('$baseUrl/posts/$postId/comments/$commentId/react');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'emotionType': emotionType}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to toggle comment reaction: ${response.body}');
+    }
   }
->>>>>>> Stashed changes
+
+  // ========== DM (Direct Message) APIs ==========
+
+  /// Get DM inbox (list of threads)
+  Future<List<dynamic>> getDmInbox() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/dm/inbox');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to get DM inbox: ${response.body}');
+    }
+  }
+
+  /// Get DM requests (message requests from non-followers)
+  Future<List<dynamic>> getDmRequests() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/dm/requests');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to get DM requests: ${response.body}');
+    }
+  }
+
+  /// Get messages in a specific thread
+  Future<List<dynamic>> getDmMessages(String threadId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/dm/threads/$threadId/messages');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to get DM messages: ${response.body}');
+    }
+  }
+
+  /// Send a DM message
+  /// If threadId is provided, sends to that thread.
+  /// If receiverId is provided (and no threadId), creates or finds a thread with that user.
+  Future<Map<String, dynamic>> sendDmMessage({
+    String? receiverId,
+    String? threadId,
+    required String content,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/dm/message');
+
+    final body = <String, dynamic>{'content': content};
+    if (receiverId != null) body['receiverId'] = int.parse(receiverId);
+    if (threadId != null) body['threadId'] = int.parse(threadId);
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to send DM message: ${response.body}');
+    }
+  }
+
+  /// Accept a DM request
+  Future<void> acceptDmRequest(String threadId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/dm/requests/$threadId/accept');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to accept DM request: ${response.body}');
+    }
+  }
+
+  /// Delete/reject a DM request
+  Future<void> deleteDmRequest(String threadId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/dm/requests/$threadId');
+
+    final response = await http.delete(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete DM request: ${response.body}');
+    }
+  }
+
+  /// Hide a DM thread (leave conversation)
+  Future<void> hideDmThread(String threadId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/dm/threads/$threadId/hide');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to hide DM thread: ${response.body}');
+    }
+  }
+
+  // 차단하기
+  Future<void> blockUser(String myUserId, String blockedUserId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('No access token found');
+
+    final url = Uri.parse('$baseUrl/blocks/$blockedUserId?userId=$myUserId');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to block user: ${response.body}');
+    }
+  }
 }

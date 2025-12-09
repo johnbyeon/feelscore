@@ -13,7 +13,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final ApiService _apiService = ApiService();
-  List<CategoryStat> _categoryStats = [];
+  final TextEditingController _searchController = TextEditingController();
+  List<CategoryStat> _categoryStats = []; // Main stats from API
+  List<CategoryStat> _allCategories = []; // Flattened list for searching
+  List<CategoryStat> _displayedCategories =
+      []; // Categories to show in main list
+  List<CategoryStat> _searchSuggestions = []; // Current search matches
+  bool _showSuggestions = false;
+
   bool _isLoading = true;
   String? _errorMessage;
   final Set<int> _expandedCategoryIds = {};
@@ -28,6 +35,8 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  String _selectedPeriod = 'ALL';
+
   @override
   void initState() {
     super.initState();
@@ -35,11 +44,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final refreshProvider = context.watch<RefreshProvider>();
     if (refreshProvider.shouldRefreshHome) {
-      // 빌드 사이클 중에 상태 변경을 피하기 위해 미세한 지연 후 실행
       Future.microtask(() {
         _fetchStats();
         context.read<RefreshProvider>().consumeRefreshHome();
@@ -48,12 +62,28 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchStats() async {
+    setState(() {
+      _isLoading = true;
+    });
     try {
-      final data = await _apiService.getHomeStats();
+      final data = await _apiService.getHomeStats(period: _selectedPeriod);
+      final stats = data.map((json) => CategoryStat.fromJson(json)).toList();
+
+      // Flatten for search
+      final all = <CategoryStat>[];
+      for (var cat in stats) {
+        all.add(cat);
+        if (cat.children.isNotEmpty) {
+          all.addAll(cat.children);
+        }
+      }
+
       setState(() {
-        _categoryStats = data
-            .map((json) => CategoryStat.fromJson(json))
-            .toList();
+        _categoryStats = stats;
+        _allCategories = all;
+        if (!_showSuggestions && _searchController.text.isEmpty) {
+          _displayedCategories = stats;
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -62,6 +92,65 @@ class _HomePageState extends State<HomePage> {
         _isLoading = false;
       });
     }
+  }
+
+  void _onPeriodChanged(String period) {
+    if (_selectedPeriod == period) return;
+    setState(() {
+      _selectedPeriod = period;
+    });
+    _fetchStats();
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedPeriod == value;
+    return GestureDetector(
+      onTap: () => _onPeriodChanged(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black87,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _onSearchChanged(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _showSuggestions = false;
+        _displayedCategories = _categoryStats;
+      });
+      return;
+    }
+
+    final lowerQuery = query.toLowerCase();
+    final matches =
+        _allCategories.where((cat) {
+          return cat.name.toLowerCase().contains(lowerQuery);
+        }).toList();
+
+    setState(() {
+      _searchSuggestions = matches;
+      _showSuggestions = true;
+    });
+  }
+
+  void _onSuggestionSelected(CategoryStat category) {
+    setState(() {
+      _searchController.text = category.name;
+      _showSuggestions = false;
+      _displayedCategories = [category];
+    });
+    FocusScope.of(context).unfocus();
   }
 
   @override
@@ -80,11 +169,47 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
+              // Period Filter
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip('전체', 'ALL'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('월간', 'MONTH'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('주간', 'WEEK'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('일간', 'DAY'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Search Bar
               TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                style: const TextStyle(
+                  color: Colors.black87,
+                ), // Updated text color
                 decoration: InputDecoration(
                   hintText: 'Search emotions...',
-                  prefixIcon: const Icon(Icons.search),
+                  hintStyle: const TextStyle(
+                    color: Colors.grey,
+                  ), // Updated hint color
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  suffixIcon:
+                      _searchController.text.isNotEmpty
+                          ? IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.grey),
+                            onPressed: () {
+                              _searchController.clear();
+                              _onSearchChanged('');
+                              FocusScope.of(context).unfocus();
+                            },
+                          )
+                          : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -94,171 +219,203 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Category List
+
+              // Content with Stack for Suggestions
               Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _fetchStats,
-                  child: ListView.builder(
-                    itemCount: _categoryStats.length,
-                    itemBuilder: (context, index) {
-                      final category = _categoryStats[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
+                child: Stack(
+                  children: [
+                    // Main List
+                    RefreshIndicator(
+                      onRefresh: _fetchStats,
+                      child: ListView.builder(
+                        itemCount: _displayedCategories.length,
+                        itemBuilder: (context, index) {
+                          final category = _displayedCategories[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
                               children: [
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              CategoryDetailPage(
-                                                categoryId: category.categoryId,
-                                                categoryName: category.name,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(12),
-                                      bottomLeft: Radius.circular(12),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16.0,
-                                        vertical: 16.0,
-                                      ), // Padding matched to look good
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            category.name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 18,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) =>
+                                                      CategoryDetailPage(
+                                                        categoryId:
+                                                            category.categoryId,
+                                                        categoryName:
+                                                            category.name,
+                                                      ),
                                             ),
-                                          ),
-                                          if (category.dominantEmotion != null)
-                                            Text(
-                                              '${_getEmotionText(category.dominantEmotion!)}(${category.score})',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: _getScoreColor(
-                                                  category.score,
+                                          );
+                                        },
+                                        borderRadius: const BorderRadius.only(
+                                          topLeft: Radius.circular(12),
+                                          bottomLeft: Radius.circular(12),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16.0,
+                                            vertical: 16.0,
+                                          ), // Padding matched to look good
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                category.name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 18,
                                                 ),
                                               ),
+                                              if (category.dominantEmotion !=
+                                                  null)
+                                                Text(
+                                                  '${_getEmotionText(category.dominantEmotion!)}(${category.score})',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: _getScoreColor(
+                                                      category.score,
+                                                    ),
+                                                  ),
+                                                )
+                                              else
+                                                Text(
+                                                  '(${category.score})',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        _expandedCategoryIds.contains(
+                                              category.categoryId,
                                             )
-                                          else
-                                            Text(
-                                              '(${category.score})',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                        ],
+                                            ? Icons.expand_less
+                                            : Icons.expand_more,
+                                        color: Colors.grey[600],
                                       ),
+                                      onPressed:
+                                          () => _toggleExpanded(
+                                            category.categoryId,
+                                          ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                                IconButton(
-                                  icon: Icon(
-                                    _expandedCategoryIds.contains(
-                                          category.categoryId,
-                                        )
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
-                                    color: Colors.grey[600],
-                                  ),
-                                  onPressed: () =>
-                                      _toggleExpanded(category.categoryId),
-                                ),
-                              ],
-                            ),
-                            if (_expandedCategoryIds.contains(
-                              category.categoryId,
-                            ))
-                              ...category.children.map((child) {
-                                return GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            CategoryDetailPage(
-                                              categoryId: child.categoryId,
-                                              categoryName: child.name,
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16.0,
-                                      vertical: 12.0,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Row(
+                                if (_expandedCategoryIds.contains(
+                                  category.categoryId,
+                                ))
+                                  ...category.children.map((child) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => CategoryDetailPage(
+                                                  categoryId: child.categoryId,
+                                                  categoryName: child.name,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16.0,
+                                          vertical: 12.0,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            const SizedBox(
-                                              width: 16,
-                                            ), // Indentation
-                                            Text(
-                                              child.name,
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.grey[700],
-                                              ),
+                                            Row(
+                                              children: [
+                                                const SizedBox(
+                                                  width: 16,
+                                                ), // Indentation
+                                                Text(
+                                                  child.name,
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey[700],
+                                                  ),
+                                                ),
+                                              ],
                                             ),
+                                            if (child.dominantEmotion != null)
+                                              Text(
+                                                '${_getEmotionText(child.dominantEmotion!)}(${child.score})',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: _getScoreColor(
+                                                    child.score,
+                                                  ),
+                                                ),
+                                              )
+                                            else
+                                              Text(
+                                                '(${child.score})',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
                                           ],
                                         ),
-                                        if (child.dominantEmotion != null)
-                                          Text(
-                                            '${_getEmotionText(child.dominantEmotion!)}(${child.score})',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: _getScoreColor(
-                                                child.score,
-                                              ),
-                                            ),
-                                          )
-                                        else
-                                          Text(
-                                            '(${child.score})',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            if (_expandedCategoryIds.contains(
-                              category.categoryId,
-                            ))
-                              const SizedBox(height: 8),
-                          ],
+                                      ),
+                                    );
+                                  }),
+                                if (_expandedCategoryIds.contains(
+                                  category.categoryId,
+                                ))
+                                  const SizedBox(height: 8),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Suggestions Overlay
+                    if (_showSuggestions && _searchSuggestions.isNotEmpty)
+                      Container(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        child: ListView.builder(
+                          itemCount: _searchSuggestions.length,
+                          itemBuilder: (context, index) {
+                            final suggestion = _searchSuggestions[index];
+                            return ListTile(
+                              title: Text(suggestion.name),
+                              trailing: Text(
+                                'Score: ${suggestion.score}',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                              onTap: () => _onSuggestionSelected(suggestion),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ],
