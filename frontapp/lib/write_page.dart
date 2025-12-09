@@ -40,8 +40,10 @@ class _WritePageState extends State<WritePage> {
 
   void _onCategoryChanged() {
     final text = _categoryController.text;
-    if (text.startsWith('#') && text.length > 1) {
-      final query = text.substring(1);
+    // #이 있든 없든 검색어 추출
+    final query = text.startsWith('#') ? text.substring(1) : text;
+
+    if (query.isNotEmpty) {
       _searchCategories(query);
     } else {
       setState(() {
@@ -154,11 +156,20 @@ class _WritePageState extends State<WritePage> {
                                   return ListTile(
                                     title: Text(category['name']),
                                     onTap: () {
+                                      // 선택 시 리스너가 트리거되어 다시 검색되는 것을 방지
+                                      _categoryController.removeListener(
+                                        _onCategoryChanged,
+                                      );
+                                      _categoryController.text =
+                                          '#${category['name']}';
+                                      _categoryController.addListener(
+                                        _onCategoryChanged,
+                                      );
+
                                       setState(() {
-                                        _categoryController.text =
-                                            '#${category['name']}';
                                         _selectedCategoryId = category['id'];
                                         _showSuggestions = false;
+                                        _categorySuggestions = [];
                                       });
                                     },
                                   );
@@ -179,7 +190,7 @@ class _WritePageState extends State<WritePage> {
                     GestureDetector(
                       onTap: _pickImage,
                       child: Container(
-                        height: 200,
+                        height: _selectedImage != null ? null : 200,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           color: Theme.of(
@@ -198,11 +209,11 @@ class _WritePageState extends State<WritePage> {
                                 child: kIsWeb
                                     ? Image.network(
                                         _selectedImage!.path,
-                                        fit: BoxFit.cover,
+                                        fit: BoxFit.fitWidth,
                                       )
                                     : Image.file(
                                         File(_selectedImage!.path),
-                                        fit: BoxFit.cover,
+                                        fit: BoxFit.fitWidth,
                                       ),
                               )
                             : Column(

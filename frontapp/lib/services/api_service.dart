@@ -158,7 +158,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getPostsByUser(
-    String userId, {
+    int userId, {
     int page = 0,
     int size = 10,
   }) async {
@@ -170,7 +170,7 @@ class ApiService {
     }
 
     final url = Uri.parse(
-      '$baseUrl/v1/posts/user/$userId?page=$page&size=$size',
+      '$baseUrl/v1/posts/user/$userId?page=$page&size=$size&sort=createdAt,desc',
     );
     final response = await http.get(
       url,
@@ -183,7 +183,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      throw Exception('Failed to get posts by user: ${response.body}');
+      throw Exception('Failed to get user posts: ${response.body}');
     }
   }
 
@@ -209,4 +209,309 @@ class ApiService {
       throw Exception('Failed to update FCM token: ${response.body}');
     }
   }
+
+  Future<Map<String, dynamic>> getPostsByCategory(
+    int categoryId, {
+    int page = 0,
+    int size = 10,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse(
+      '$baseUrl/v1/posts/category/$categoryId?page=$page&size=$size&sort=createdAt,desc',
+    );
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get category posts: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getHomeStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/stats/home');
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get home stats: ${response.body}');
+    }
+  }
+
+  Future<void> updateUserProfileImage(String profileImageUrl) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/user/profile-image');
+    final response = await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'profileImageUrl': profileImageUrl}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update profile image: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getFollowers(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/follows/$userId/followers');
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get followers: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getFollowings(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/follows/$userId/followings');
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get followings: ${response.body}');
+    }
+  }
+
+  Future<bool> toggleFollow(String targetUserId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/follows/$targetUserId');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return response.body == 'true';
+    } else {
+      throw Exception('Failed to toggle follow: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getFollowStats(String targetUserId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    // Token is optional for stats, but sending it allows checking isFollowing
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final url = Uri.parse('$baseUrl/follows/$targetUserId/stats');
+    final response = await http.get(url, headers: headers);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get follow stats: ${response.body}');
+    }
+  }
+
+  // Comments
+  Future<List<dynamic>> getComments(String postId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    final url = Uri.parse('$baseUrl/posts/$postId/comments');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await http.get(url, headers: headers);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get comments: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> createComment(
+    String postId,
+    String content,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/posts/$postId/comments');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'content': content}),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to create comment: ${response.body}');
+    }
+  }
+
+  // Reactions (Empathy)
+  Future<void> toggleReaction(String postId, String emotionType) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse('$baseUrl/posts/$postId/react');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'emotionType': emotionType}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to toggle reaction: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getReactionStats(String postId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    final url = Uri.parse('$baseUrl/posts/$postId/react');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await http.get(url, headers: headers);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get reaction stats: ${response.body}');
+    }
+  }
+
+  Future<void> increasePostView(String postId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    final url = Uri.parse('$baseUrl/posts/$postId');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    // Call GET /posts/{id} triggers view count increase in backend
+    final response = await http.get(url, headers: headers);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to increase view count: ${response.body}');
+    }
+  }
+
+  Future<void> toggleCommentReaction(
+    String commentId,
+    String emotionType,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      throw Exception('No access token found');
+    }
+
+    final url = Uri.parse(
+      '$baseUrl/posts/$commentId/comments/$commentId/react',
+    ); // ERROR: Check Backend Controller path!
+    // Backend CommentController path: @RequestMapping("/api/posts/{postId}/comments")
+    // Post mapping: @PostMapping("/{commentId}/react")
+    // So full URL is /api/posts/{postId}/comments/{commentId}/react
+    // Wait, the backend logic for CommentController uses @RequestMapping("/api/posts/{postId}/comments").
+    // But toggleReaction is @PostMapping("/{commentId}/react").
+    // So path is /api/posts/{postId}/comments/{commentId}/react.
+    // I need postId in toggleCommentReaction?
+    // Let's check CommentController again.
+    // YES. @RequestMapping("/api/posts/{postId}/comments")
+    // So I need postId.
+  }
+>>>>>>> Stashed changes
 }

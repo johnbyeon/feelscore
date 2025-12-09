@@ -4,6 +4,8 @@ import 'providers/user_provider.dart';
 import 'providers/refresh_provider.dart';
 import 'screens/login_screen.dart';
 import 'main_screen.dart';
+import 'widgets/responsive_layout.dart';
+import 'web_main_screen.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -134,7 +136,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         if (userProvider.isLoggedIn) {
-          return const MainScreen();
+          return const ResponsiveLayout(
+            mobileBody: MainScreen(),
+            webBody: WebMainScreen(),
+          );
         } else {
           return const LoginScreen();
         }

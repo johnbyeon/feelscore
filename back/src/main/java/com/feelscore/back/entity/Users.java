@@ -28,6 +28,9 @@ public class Users extends BaseTimeEntity {
     @Column(nullable = false)
     private String password; // 🔹 비밀번호 추가 (BCrypt 인코딩)
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl; // 프로필 이미지 URL
+
     @Enumerated(EnumType.STRING)
     private Role role; // USER, ADMIN
 
@@ -37,11 +40,12 @@ public class Users extends BaseTimeEntity {
     private LocalDateTime lastLoginAt; // 마지막 접속일 (별도 관리)
 
     @Builder
-    private Users(String email, String password, String nickname, Role role) {
+    private Users(String email, String password, String nickname, Role role, String profileImageUrl) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
         this.role = role == null ? Role.USER : role;
+        this.profileImageUrl = profileImageUrl;
     }
 
     /**
@@ -70,5 +74,9 @@ public class Users extends BaseTimeEntity {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public void updateProfileImage(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }

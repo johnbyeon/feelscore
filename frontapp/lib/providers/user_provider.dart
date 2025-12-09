@@ -9,20 +9,24 @@ class UserProvider with ChangeNotifier {
   bool _isLoggedIn = false;
   String? _userId;
   String? _nickname;
+  String? _profileImageUrl;
 
   bool get isLoggedIn => _isLoggedIn;
   String? get userId => _userId;
   String? get nickname => _nickname;
+  String? get profileImageUrl => _profileImageUrl;
 
   Future<void> checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
     final nickname = prefs.getString('nickname');
+    final profileImageUrl = prefs.getString('profileImageUrl');
 
     if (userId != null) {
       _isLoggedIn = true;
       _userId = userId;
       _nickname = nickname;
+      _profileImageUrl = profileImageUrl;
       notifyListeners();
     }
   }
@@ -32,12 +36,18 @@ class UserProvider with ChangeNotifier {
       final data = await _apiService.login(email, password);
       _userId = data['id'].toString();
       _nickname = data['nickname'];
+      _profileImageUrl = data['profileImageUrl'];
       _isLoggedIn = true;
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('userId', _userId!);
       await prefs.setString('nickname', _nickname!);
       await prefs.setString('accessToken', data['access_token']);
+      if (_profileImageUrl != null) {
+        await prefs.setString('profileImageUrl', _profileImageUrl!);
+      } else {
+        await prefs.remove('profileImageUrl');
+      }
 
       // 🔹 로그인 성공 후 FCM 토큰 서버로 전송
       try {
@@ -68,10 +78,25 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  Future<void> updateProfileImage(String profileImageUrl) async {
+    try {
+      await _apiService.updateUserProfileImage(profileImageUrl);
+      _profileImageUrl = profileImageUrl;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('profileImageUrl', profileImageUrl);
+
+      notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> logout() async {
     _isLoggedIn = false;
     _userId = null;
     _nickname = null;
+    _profileImageUrl = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();

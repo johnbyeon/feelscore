@@ -1,19 +1,17 @@
 package com.feelscore.back.service;
 
-import com.feelscore.back.entity.*;
-import com.feelscore.back.repository.CommentReactionRepository;
+import com.feelscore.back.dto.CommentDto;
+import com.feelscore.back.entity.Comment;
+import com.feelscore.back.entity.Post;
+import com.feelscore.back.entity.Users;
 import com.feelscore.back.repository.CommentRepository;
 import com.feelscore.back.repository.PostRepository;
 import com.feelscore.back.repository.UserRepository;
-import lombok.Builder;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
@@ -28,21 +26,17 @@ public class CommentService {
         private final UserRepository userRepository;
         private final NotificationProducer notificationProducer; // 🔹 알림 발송자 주입
 
-        /**
-         * 댓글 작성
-         */
         @Transactional
-        public Long createComment(Long postId, Long userId, String content, EmotionType emotion) {
+        public CommentDto.Response createComment(Long postId, Long userId, String content) {
                 Post post = postRepository.findById(postId)
-                                .orElseThrow(() -> new NoSuchElementException("Post not found with id: " + postId));
+                                .orElseThrow(() -> new NoSuchElementException("Post not found id: " + postId));
                 Users user = userRepository.findById(userId)
-                                .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
+                                .orElseThrow(() -> new NoSuchElementException("User not found id: " + userId));
 
                 Comment comment = Comment.builder()
-                                .content(content)
-                                .emotion(emotion)
                                 .post(post)
                                 .users(user)
+                                .content(content)
                                 .build();
 
                 commentRepository.save(comment);
@@ -58,86 +52,62 @@ public class CommentService {
                         notificationProducer.sendNotification(fcmRequest);
                 }
 
-                return comment.getId();
+                return CommentDto.Response.from(comment);
         }
 
-        /**
-         * 댓글 반응 추가/수정
-         */
+        public List<CommentDto.Response> getComments(Long postId, Long userId) {
+                Post post = postRepository.findById(postId)
+                                .orElseThrow(() -> new NoSuchElementException("Post not found id: " + postId));
+
+                List<Comment> comments = commentRepository.findByPostOrderByCreatedAtAsc(post);
+
+                return comments.stream().map(comment -> {
+                        List<Object[]> reactionObjs = commentReactionRepository.countReactionsByComment(comment);
+                        Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new HashMap<>();
+                        for (Object[] row : reactionObjs) {
+                                reactionCounts.put((com.feelscore.back.entity.EmotionType) row[0], (Long) row[1]);
+                        }
+
+                        com.feelscore.back.entity.EmotionType myReaction = null;
+                        if (userId != null) {
+                                Users user = userRepository.findById(userId).orElse(null);
+                                if (user != null) {
+                                        myReaction = commentReactionRepository.findByCommentAndUsers(comment, user)
+                                                        .map(com.feelscore.back.entity.CommentReaction::getEmotionType)
+                                                        .orElse(null);
+                                }
+                        }
+
+                        return CommentDto.Response.from(comment, reactionCounts, myReaction);
+                }).collect(Collectors.toList());
+        }
+
         @Transactional
-        public void addReaction(Long commentId, Long userId, EmotionType emotion) {
+        public void toggleCommentReaction(Long commentId, Long userId,
+                        com.feelscore.back.entity.EmotionType emotionType) {
                 Comment comment = commentRepository.findById(commentId)
-                                .orElseThrow(() -> new NoSuchElementException(
-                                                "Comment not found with id: " + commentId));
+                                .orElseThrow(() -> new NoSuchElementException("Comment not found id: " + commentId));
                 Users user = userRepository.findById(userId)
-                                .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
+                                .orElseThrow(() -> new NoSuchElementException("User not found id: " + userId));
 
-                CommentReaction reaction = commentReactionRepository.findByCommentAndUsers(comment, user)
-                                .orElse(null);
+                Optional<com.feelscore.back.entity.CommentReaction> existingReaction = commentReactionRepository
+                                .findByCommentAndUsers(comment, user);
 
-                if (reaction == null) {
-                        reaction = CommentReaction.builder()
+                if (existingReaction.isPresent()) {
+                        com.feelscore.back.entity.CommentReaction reaction = existingReaction.get();
+                        if (reaction.getEmotionType() == emotionType) {
+                                commentReactionRepository.delete(reaction);
+                        } else {
+                                reaction.updateEmotion(emotionType);
+                        }
+                } else {
+                        com.feelscore.back.entity.CommentReaction reaction = com.feelscore.back.entity.CommentReaction
+                                        .builder()
                                         .comment(comment)
                                         .users(user)
-                                        .emotion(emotion)
+                                        .emotionType(emotionType)
                                         .build();
                         commentReactionRepository.save(reaction);
-                } else {
-                        reaction.updateEmotion(emotion);
                 }
-        }
-
-        /**
-         * 댓글 반응 삭제
-         */
-        @Transactional
-        public void removeReaction(Long commentId, Long userId) {
-                Comment comment = commentRepository.findById(commentId)
-                                .orElseThrow(() -> new NoSuchElementException(
-                                                "Comment not found with id: " + commentId));
-                Users user = userRepository.findById(userId)
-                                .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
-
-                CommentReaction reaction = commentReactionRepository.findByCommentAndUsers(comment, user)
-                                .orElseThrow(() -> new NoSuchElementException("Reaction not found"));
-
-                commentReactionRepository.delete(reaction);
-        }
-
-        /**
-         * 게시글의 댓글 목록 조회 (반응 집계 포함)
-         */
-        public List<CommentResponse> getCommentsByPost(Long postId) {
-                List<Comment> comments = commentRepository.findByPostId(postId);
-
-                return comments.stream()
-                                .map(this::toResponse)
-                                .collect(Collectors.toList());
-        }
-
-        private CommentResponse toResponse(Comment comment) {
-                // 반응 집계
-                Map<EmotionType, Long> reactionCounts = comment.getReactions().stream()
-                                .collect(Collectors.groupingBy(CommentReaction::getEmotion, Collectors.counting()));
-
-                return CommentResponse.builder()
-                                .id(comment.getId())
-                                .content(comment.getContent())
-                                .emotion(comment.getEmotion())
-                                .writerNickname(comment.getUsers().getNickname())
-                                .createdAt(comment.getCreatedAt())
-                                .reactionCounts(reactionCounts)
-                                .build();
-        }
-
-        @Getter
-        @Builder
-        public static class CommentResponse {
-                private Long id;
-                private String content;
-                private EmotionType emotion;
-                private String writerNickname;
-                private LocalDateTime createdAt;
-                private Map<EmotionType, Long> reactionCounts;
         }
 }

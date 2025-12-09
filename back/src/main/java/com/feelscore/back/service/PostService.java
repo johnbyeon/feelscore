@@ -13,6 +13,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 import static com.feelscore.back.dto.PostDto.*;
@@ -27,6 +29,9 @@ public class PostService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final PostAnalysisProducer postAnalysisProducer;
+    private final com.feelscore.back.repository.PostReactionRepository postReactionRepository;
+    private final com.feelscore.back.repository.CommentRepository commentRepository;
+    private final com.feelscore.back.repository.PostViewRepository postViewRepository;
 
     @Transactional
     public Response createPost(@Valid CreateRequest request, Long userId) {
@@ -58,8 +63,35 @@ public class PostService {
     }
 
     public Page<ListResponse> getPostsByCategory(Long categoryId, Pageable pageable) {
-        Page<Post> posts = postRepository.findByCategory_IdAndStatus(categoryId, PostStatus.NORMAL, pageable);
-        return posts.map(ListResponse::from);
+        // 1. 해당 카테고리 및 하위 카테고리 ID 목록 수집
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new NoSuchElementException("Category not found with id: " + categoryId));
+
+        List<Long> categoryIds = new ArrayList<>();
+        categoryIds.add(categoryId);
+        for (Category child : category.getChildren()) {
+            categoryIds.add(child.getId());
+        }
+
+        // 2. 게시글 조회 (감정 포함)
+        Page<Object[]> results = postRepository.findByCategory_IdInAndStatusWithEmotion(categoryIds, PostStatus.NORMAL,
+                pageable);
+
+        return results.map(result -> {
+            Post post = (Post) result[0];
+            Object emotionObj = result[1];
+            String emotion = (emotionObj != null) ? emotionObj.toString() : null;
+            Long viewCount = postViewRepository.countByPost(post);
+            Long commentCount = commentRepository.countByPost(post);
+
+            List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
+            java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
+            for (Object[] row : reactionObjs) {
+                reactionCounts.put((com.feelscore.back.entity.EmotionType) row[0], (Long) row[1]);
+            }
+
+            return ListResponse.from(post, emotion, viewCount, commentCount, reactionCounts);
+        });
     }
 
     public Page<ListResponse> getPostsByUser(Long userId, Pageable pageable) {
@@ -68,7 +100,16 @@ public class PostService {
             Post post = (Post) result[0];
             Object emotionObj = result[1];
             String emotion = (emotionObj != null) ? emotionObj.toString() : null;
-            return ListResponse.from(post, emotion);
+            Long viewCount = postViewRepository.countByPost(post);
+            Long commentCount = commentRepository.countByPost(post);
+
+            List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
+            java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
+            for (Object[] row : reactionObjs) {
+                reactionCounts.put((com.feelscore.back.entity.EmotionType) row[0], (Long) row[1]);
+            }
+
+            return ListResponse.from(post, emotion, viewCount, commentCount, reactionCounts);
         });
     }
 

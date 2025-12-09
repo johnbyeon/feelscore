@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
@@ -24,12 +26,12 @@ public class UserController {
     /**
      * 내 정보 조회 (JWT 필요)
      *
-     * GET  /api/user/me
+     * GET /api/user/me
      * POST /api/user/me
      *
      * Header: Authorization: Bearer {accessToken}
      */
-    @RequestMapping(value = "/me", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/me", method = { RequestMethod.GET, RequestMethod.POST })
     public ResponseEntity<UserMeResponse> getMyInfo(Authentication authentication) {
 
         // LoginFilter + CustomUserDetails 에서 넣어준 username(email)
@@ -73,5 +75,20 @@ public class UserController {
     @NoArgsConstructor
     public static class FcmTokenRequest {
         private String token;
+    }
+
+    @PatchMapping("/profile-image")
+    public ResponseEntity<Void> updateProfileImage(Authentication authentication,
+            @RequestBody Map<String, String> request) {
+        String email = authentication.getName();
+        String profileImageUrl = request.get("profileImageUrl");
+
+        Users user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        user.updateProfileImage(profileImageUrl);
+        userRepository.save(user); // JPA Dirty Checking으로 생략 가능하지만 명시적으로 저장
+
+        return ResponseEntity.ok().build();
     }
 }

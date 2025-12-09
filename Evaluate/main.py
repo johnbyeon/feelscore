@@ -50,6 +50,8 @@ class PostEmotion(Base):
     surprise_score = Column(Integer, nullable=False, default=0)
     contempt_score = Column(Integer, nullable=False, default=0)
     love_score = Column(Integer, nullable=False, default=0)
+    anticipation_score = Column(Integer, nullable=False, default=0) # Added
+    trust_score = Column(Integer, nullable=False, default=0)       # Added
     neutral_score = Column(Integer, nullable=False, default=0)
 
     dominant_emotion = Column(String(50), nullable=False, default="NEUTRAL")
@@ -80,10 +82,12 @@ def init_ollama():
 1. "박제", "주접" = Love/Joy (Anger 아님)
 2. "혼나다", "돈쭐" = 칭찬/걱정의 반어법 (Neutral/Love)
 3. 비속어/혐오표현 = Disgust/Anger
+4. "기대된다", "설렌다" = Anticipation
+5. "믿는다", "응원한다" = Trust
 
 출력 형식 (JSON Only):
 {{
-    "scores": {{ "joy": int, "sadness": int, "anger": int, "fear": int, "disgust": int, "surprise": int, "contempt": int, "love": int, "neutral": int }},
+    "scores": {{ "joy": int, "sadness": int, "anger": int, "fear": int, "disgust": int, "surprise": int, "contempt": int, "love": int, "anticipation": int, "trust": int, "neutral": int }},
     "primary": "string"
 }}
 
@@ -115,11 +119,15 @@ def analyze_emotion(content):
         result = json.loads(raw_res.strip())
         
         scores = result.get("scores", {})
-        dominant = result.get("primary", "NEUTRAL").upper()
-        
         # Normalize keys
         scores = {k.lower(): int(v) for k, v in scores.items()}
         
+        # Calculate dominant emotion from scores
+        if scores:
+            dominant = max(scores, key=scores.get).upper()
+        else:
+            dominant = "NEUTRAL"
+            
         return scores, dominant
 
     except Exception as e:
@@ -137,6 +145,8 @@ def analyze_emotion_mock(content):
         "surprise": random.randint(0, 10),
         "contempt": random.randint(0, 10),
         "love": random.randint(0, 10),
+        "anticipation": random.randint(0, 10),
+        "trust": random.randint(0, 10),
         "neutral": random.randint(0, 5)
     }
     dominant = max(scores, key=scores.get).upper()
@@ -174,6 +184,8 @@ def callback(ch, method, properties, body):
                 existing.surprise_score = scores.get("surprise", 0)
                 existing.contempt_score = scores.get("contempt", 0)
                 existing.love_score = scores.get("love", 0)
+                existing.anticipation_score = scores.get("anticipation", 0)
+                existing.trust_score = scores.get("trust", 0)
                 existing.neutral_score = scores.get("neutral", 0)
                 existing.dominant_emotion = dominant
                 existing.is_analyzed = True
@@ -189,6 +201,8 @@ def callback(ch, method, properties, body):
                     surprise_score=scores.get("surprise", 0),
                     contempt_score=scores.get("contempt", 0),
                     love_score=scores.get("love", 0),
+                    anticipation_score=scores.get("anticipation", 0),
+                    trust_score=scores.get("trust", 0),
                     neutral_score=scores.get("neutral", 0),
                     dominant_emotion=dominant,
                     is_analyzed=True
@@ -198,13 +212,25 @@ def callback(ch, method, properties, body):
             db.commit()
             print(f" [v] Saved analysis for Post ID {post_id}")
             
+            # 3. Publish Completion Event
+            completion_message = json.dumps({"postId": post_id})
+            ch.basic_publish(
+                exchange='',
+                routing_key='q.post.analysis.complete',
+                properties=pika.BasicProperties(
+                    content_type='application/json'
+                ),
+                body=completion_message
+            )
+            print(f" [>] Sent completion event for Post ID {post_id}")
+            
         except Exception as e:
             print(f"Error saving to DB: {e}")
             db.rollback()
         finally:
             db.close()
 
-        # 3. Acknowledge
+        # 4. Acknowledge
         ch.basic_ack(delivery_tag=method.delivery_tag)
         
     except Exception as e:
@@ -224,6 +250,7 @@ if __name__ == "__main__":
             channel = connection.channel()
             
             channel.queue_declare(queue='q.post.analysis', durable=True)
+            channel.queue_declare(queue='q.post.analysis.complete', durable=True) # Declare completion queue
             
             print(' [*] Waiting for messages in q.post.analysis. To exit press CTRL+C')
             

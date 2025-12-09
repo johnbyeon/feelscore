@@ -40,12 +40,19 @@ public class EmotionScores {
     private Integer loveScore = 0; // 사랑 점수
 
     @Column(nullable = false)
+    private Integer anticipationScore = 0; // 기대 점수
+
+    @Column(nullable = false)
+    private Integer trustScore = 0; // 신뢰 점수
+
+    @Column(nullable = false)
     private Integer neutralScore = 0; // 중립 점수
 
     @Builder // 빌더 패턴을 사용하여 객체를 생성할 수 있게 합니다.
     public EmotionScores(Integer joyScore, Integer sadnessScore, Integer angerScore,
-                         Integer fearScore, Integer disgustScore, Integer surpriseScore,
-                         Integer contemptScore, Integer loveScore, Integer neutralScore) {
+            Integer fearScore, Integer disgustScore, Integer surpriseScore,
+            Integer contemptScore, Integer loveScore, Integer anticipationScore,
+            Integer trustScore, Integer neutralScore) {
         // 입력된 값이 null이면 0으로 설정하여 데이터 무결성을 보장합니다.
         this.joyScore = joyScore != null ? joyScore : 0;
         this.sadnessScore = sadnessScore != null ? sadnessScore : 0;
@@ -55,6 +62,8 @@ public class EmotionScores {
         this.surpriseScore = surpriseScore != null ? surpriseScore : 0;
         this.contemptScore = contemptScore != null ? contemptScore : 0;
         this.loveScore = loveScore != null ? loveScore : 0;
+        this.anticipationScore = anticipationScore != null ? anticipationScore : 0;
+        this.trustScore = trustScore != null ? trustScore : 0;
         this.neutralScore = neutralScore != null ? neutralScore : 0;
     }
 
@@ -69,6 +78,8 @@ public class EmotionScores {
             case SURPRISE -> surpriseScore;
             case CONTEMPT -> contemptScore;
             case LOVE -> loveScore;
+            case ANTICIPATION -> anticipationScore;
+            case TRUST -> trustScore;
             case NEUTRAL -> neutralScore;
         };
     }
