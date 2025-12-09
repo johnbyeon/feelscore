@@ -17,6 +17,7 @@ public class RabbitMQConfig {
 
     // 기존 포스트 분석용
     public static final String QUEUE_NAME = "q.post.analysis";
+    public static final String ANALYSIS_COMPLETE_QUEUE = "q.post.analysis.complete";
     public static final String EXCHANGE_NAME = "x.post.analysis";
     public static final String ROUTING_KEY = "k.post.analyze";
 
@@ -31,6 +32,11 @@ public class RabbitMQConfig {
     @Bean
     public Queue queue() {
         return new Queue(QUEUE_NAME, true); // Durable queue
+    }
+
+    @Bean
+    public Queue analysisCompleteQueue() {
+        return new Queue(ANALYSIS_COMPLETE_QUEUE, true);
     }
 
     @Bean

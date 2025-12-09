@@ -1,0 +1,14 @@
+package com.feelscore.back.dto;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+public class FCMRequestDto {
+    private String targetToken;
+    private String title;
+    private String body;
+}

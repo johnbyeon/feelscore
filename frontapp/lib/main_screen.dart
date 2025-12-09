@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'write_page.dart';
 import 'history_page.dart';
 import 'home_page.dart';
+import 'screens/dm_inbox_page.dart';
 
 import 'package:provider/provider.dart';
 import 'providers/refresh_provider.dart';
+import 'providers/user_provider.dart';
+import 'screens/user_profile_page.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -20,13 +23,28 @@ class _MainScreenState extends State<MainScreen> {
     const HomePage(),
     WritePage(onPostSuccess: () => _onItemTapped(0)),
     const HistoryPage(),
-    const Center(child: Text('Profile')), // Placeholder for Profile
+    const DmInboxPage(),
+    Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        return UserProfilePage(
+          userId: userProvider.userId ?? '',
+          nickname: userProvider.nickname ?? 'Guest',
+          profileImageUrl: userProvider.profileImageUrl,
+        );
+      },
+    ),
   ];
 
   void _onItemTapped(int index) {
     if (index == 2) {
       // History 탭 선택 시 새로고침 트리거
       context.read<RefreshProvider>().triggerRefreshHistory();
+    } else if (index == 0) {
+      // Home 탭 선택 시 새로고침 트리거
+      context.read<RefreshProvider>().triggerRefreshHome();
+    } else if (index == 4) {
+      // Profile 탭 선택 시 새로고침 트리거 (now index 4)
+      context.read<RefreshProvider>().triggerRefreshProfile();
     }
     setState(() {
       _selectedIndex = index;
@@ -56,6 +74,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.history_rounded, size: 32),
             selectedIcon: Icon(Icons.history_edu_rounded, size: 32),
             label: 'History',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.mail_outline, size: 32),
+            selectedIcon: Icon(Icons.mail_rounded, size: 32),
+            label: 'Messages',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline, size: 32),

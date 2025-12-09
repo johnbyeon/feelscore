@@ -4,8 +4,32 @@ import 'providers/user_provider.dart';
 import 'providers/refresh_provider.dart';
 import 'screens/login_screen.dart';
 import 'main_screen.dart';
+import 'widgets/responsive_layout.dart';
+import 'web_main_screen.dart';
 
-void main() {
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/fcm_service.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("Handling a background message: ${message.messageId}");
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Initialize FCM Service
+    await FCMService().initialize();
+  } catch (e) {
+    print("Failed to initialize Firebase: $e");
+    // Continue app execution even if Firebase fails
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -117,7 +141,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         if (userProvider.isLoggedIn) {
-          return const MainScreen();
+          return const ResponsiveLayout(
+            mobileBody: MainScreen(),
+            webBody: WebMainScreen(),
+          );
         } else {
           return const LoginScreen();
         }

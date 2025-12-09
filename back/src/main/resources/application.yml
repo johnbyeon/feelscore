@@ -125,8 +125,8 @@ spring:
             redirect-uri: "https://www.proteinfriends.shop/login/oauth2/code/google"
             scope: [profile, email]
           naver:
-            client-id: ${NAVER_CLIENT_ID}
-            client-secret: ${NAVER_SECRET_ID}
+            client-isecretd: ${NAVER_CLIENT_ID}
+            client-: ${NAVER_SECRET_ID}
             redirect-uri: "https://www.proteinfriends.shop/login/oauth2/code/naver"
             authorization-grant-type: authorization_code
             client-name: Naver

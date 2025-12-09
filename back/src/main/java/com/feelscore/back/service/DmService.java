@@ -19,7 +19,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.feelscore.back.entity.Block;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -185,7 +188,9 @@ public class DmService {
      */
     @Transactional(readOnly = true)
     public List<DmThreadMember> getInbox(Long userId) {
-        return dmThreadMemberRepository.findByUserIdAndFolderAndHiddenFalse(userId, DmFolder.PRIMARY);
+        List<DmThreadMember> members = dmThreadMemberRepository.findByUserIdAndFolderAndHiddenFalse(userId,
+                DmFolder.PRIMARY);
+        return filterBlockedMembers(userId, members);
     }
 
     /**
@@ -193,7 +198,35 @@ public class DmService {
      */
     @Transactional(readOnly = true)
     public List<DmThreadMember> getRequestBox(Long userId) {
-        return dmThreadMemberRepository.findByUserIdAndStateAndHiddenFalse(userId, DmMemberState.REQUEST);
+        List<DmThreadMember> members = dmThreadMemberRepository.findByUserIdAndStateAndHiddenFalse(userId,
+                DmMemberState.REQUEST);
+        return filterBlockedMembers(userId, members);
+    }
+
+    private List<DmThreadMember> filterBlockedMembers(Long userId, List<DmThreadMember> members) {
+        Users me = findUser(userId);
+        List<Block> blocks = blockRepository.findByBlocker(me);
+        Set<Long> blockedUserIds = blocks.stream()
+                .map(block -> block.getBlocked().getId())
+                .collect(Collectors.toSet());
+
+        if (blockedUserIds.isEmpty()) {
+            return members;
+        }
+
+        return members.stream()
+                .filter(member -> {
+                    // Check other members in the thread
+                    for (DmThreadMember m : member.getThread().getMembers()) {
+                        if (!m.getUser().getId().equals(userId)) {
+                            if (blockedUserIds.contains(m.getUser().getId())) {
+                                return false; // Blocked user found in thread
+                            }
+                        }
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
     }
 
     /**

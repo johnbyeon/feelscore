@@ -10,13 +10,13 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "comment_reactions", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_comment_user_reaction", columnNames = { "comment_id", "user_id" })
+        @UniqueConstraint(columnNames = { "comment_id", "user_id" })
 })
-public class CommentReaction extends BaseTimeEntity {
+public class CommentReaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "comment_reaction_id")
+    @Column(name = "reaction_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -29,16 +29,16 @@ public class CommentReaction extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private EmotionType emotion; // 반응 감정 (좋아요 대신 감정 표현)
+    private EmotionType emotionType;
 
     @Builder
-    public CommentReaction(Comment comment, Users users, EmotionType emotion) {
+    public CommentReaction(Comment comment, Users users, EmotionType emotionType) {
         this.comment = comment;
         this.users = users;
-        this.emotion = emotion;
+        this.emotionType = emotionType;
     }
 
-    public void updateEmotion(EmotionType emotion) {
-        this.emotion = emotion;
+    public void updateEmotion(EmotionType emotionType) {
+        this.emotionType = emotionType;
     }
 }

@@ -1,5 +1,7 @@
 package com.feelscore.back.service;
 
+import com.feelscore.back.dto.FollowDto;
+import com.feelscore.back.dto.UsersDto;
 import com.feelscore.back.entity.Follow;
 import com.feelscore.back.entity.Users;
 import com.feelscore.back.repository.FollowRepository;
@@ -25,91 +27,95 @@ public class FollowService {
         private final BlockRepository blockRepository;
 
         /**
-         * 팔로우 하기
+         * 팔로우 토글 (팔로우 <-> 언팔로우)
          */
         @Transactional
-        public void follow(Long followerId, Long followingId) {
-                if (followerId.equals(followingId)) {
+        public boolean toggleFollow(Long currentUserId, Long targetUserId) {
+                if (currentUserId.equals(targetUserId)) {
                         throw new IllegalArgumentException("자기 자신을 팔로우할 수 없습니다.");
                 }
 
-                Users follower = userRepository.findById(followerId)
+                Users currentUser = userRepository.findById(currentUserId)
                                 .orElseThrow(() -> new NoSuchElementException(
-                                                "Follower not found with id: " + followerId));
-                Users following = userRepository.findById(followingId)
+                                                "User not found with id: " + currentUserId));
+                Users targetUser = userRepository.findById(targetUserId)
                                 .orElseThrow(() -> new NoSuchElementException(
-                                                "User to follow not found with id: " + followingId));
-
-                if (followRepository.existsByFollowerAndFollowing(follower, following)) {
-                        throw new IllegalStateException("이미 팔로우 중입니다.");
-                }
+                                                "Target user not found with id: " + targetUserId));
 
                 // 차단 관계 확인 (서로 차단되어 있으면 팔로우 불가)
-                if (blockRepository.existsByBlockerAndBlocked(following, follower) ||
-                                blockRepository.existsByBlockerAndBlocked(follower, following)) {
+                if (blockRepository.existsByBlockerAndBlocked(currentUser, targetUser) ||
+                                blockRepository.existsByBlockerAndBlocked(targetUser, currentUser)) {
                         throw new IllegalStateException("차단된 유저입니다.");
                 }
 
-                Follow follow = Follow.builder()
-                                .follower(follower)
-                                .following(following)
+                if (followRepository.existsByFollowerAndFollowing(currentUser, targetUser)) {
+                        followRepository.deleteByFollowerAndFollowing(currentUser, targetUser);
+                        return false; // 언팔로우 됨
+                } else {
+                        Follow follow = Follow.builder()
+                                        .follower(currentUser)
+                                        .following(targetUser)
+                                        .build();
+                        followRepository.save(follow);
+                        return true; // 팔로우 됨
+                }
+        }
+
+        /**
+         * 팔로우 통계 조회 (팔로워 수, 팔로잉 수, 맞팔 여부 등)
+         */
+        public FollowDto.Stats getStats(Long targetUserId, Long currentUserId) {
+                Users targetUser = userRepository.findById(targetUserId)
+                                .orElseThrow(() -> new NoSuchElementException(
+                                                "User not found with id: " + targetUserId));
+
+                long followerCount = followRepository.countByFollowing(targetUser);
+                long followingCount = followRepository.countByFollower(targetUser);
+                boolean isFollowing = false;
+
+                if (currentUserId != null) {
+                        Users currentUser = userRepository.findById(currentUserId).orElse(null);
+                        if (currentUser != null) {
+                                isFollowing = followRepository.existsByFollowerAndFollowing(currentUser, targetUser);
+                        }
+                }
+
+                return FollowDto.Stats.builder()
+                                .followerCount(followerCount)
+                                .followingCount(followingCount)
+                                .isFollowing(isFollowing)
                                 .build();
-
-                followRepository.save(follow);
         }
 
         /**
-         * 언팔로우 하기
+         * 팔로워 목록 조회
          */
-        @Transactional
-        public void unfollow(Long followerId, Long followingId) {
-                Users follower = userRepository.findById(followerId)
-                                .orElseThrow(() -> new NoSuchElementException(
-                                                "Follower not found with id: " + followerId));
-                Users following = userRepository.findById(followingId)
-                                .orElseThrow(() -> new NoSuchElementException(
-                                                "User to unfollow not found with id: " + followingId));
-
-                followRepository.deleteByFollowerAndFollowing(follower, following);
-        }
-
-        /**
-         * 팔로워 목록 조회 (나를 팔로우 하는 사람들)
-         */
-        public List<FollowDto> getFollowers(Long userId) {
+        public List<UsersDto.SimpleResponse> getFollowers(Long userId) {
                 Users user = userRepository.findById(userId)
                                 .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
 
                 return followRepository.findByFollowing(user).stream()
-                                .map(follow -> FollowDto.from(follow.getFollower()))
+                                .map(follow -> UsersDto.SimpleResponse.from(follow.getFollower()))
                                 .collect(Collectors.toList());
         }
 
         /**
-         * 팔로잉 목록 조회 (내가 팔로우 하는 사람들)
+         * 팔로잉 목록 조회
          */
-        public List<FollowDto> getFollowings(Long userId) {
+        public List<UsersDto.SimpleResponse> getFollowings(Long userId) {
                 Users user = userRepository.findById(userId)
                                 .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
 
                 return followRepository.findByFollower(user).stream()
-                                .map(follow -> FollowDto.from(follow.getFollowing()))
+                                .map(follow -> UsersDto.SimpleResponse.from(follow.getFollowing()))
                                 .collect(Collectors.toList());
         }
 
         @Getter
         @Builder
-        public static class FollowDto {
+        public static class FollowDtoInner { // Inner class unused if utilizing separate DTOs, but kept if needed
                 private Long userId;
                 private String nickname;
                 private String email;
-
-                public static FollowDto from(Users user) {
-                        return FollowDto.builder()
-                                        .userId(user.getId())
-                                        .nickname(user.getNickname())
-                                        .email(user.getEmail())
-                                        .build();
-                }
         }
 }
