@@ -18,6 +18,7 @@ public class DmMessageResponse {
     private String content;
     private String imageUrl;
     private boolean deleted;
+    @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
 
     /**

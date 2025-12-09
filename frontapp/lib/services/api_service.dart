@@ -562,7 +562,13 @@ class ApiService {
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as List<dynamic>;
+      final data = jsonDecode(response.body);
+      // Backend returns Page<DmMessageResponse>, so we extract 'content'
+      if (data is Map<String, dynamic> && data.containsKey('content')) {
+        return data['content'] as List<dynamic>;
+      }
+      // Fallback if it is a list (legacy)
+      return data as List<dynamic>;
     } else {
       throw Exception('Failed to get DM messages: ${response.body}');
     }
