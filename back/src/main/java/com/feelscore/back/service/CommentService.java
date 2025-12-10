@@ -112,6 +112,17 @@ public class CommentService {
                                         .emotionType(emotionType)
                                         .build();
                         commentReactionRepository.save(reaction);
+
+                        // 🔹 알림 발송 (내 댓글에 내가 반응하면 알림 X)
+                        Users commentWriter = comment.getUsers();
+                        if (!commentWriter.getId().equals(userId) && commentWriter.getFcmToken() != null) {
+                                com.feelscore.back.dto.FCMRequestDto fcmRequest = new com.feelscore.back.dto.FCMRequestDto();
+                                fcmRequest.setTargetToken(commentWriter.getFcmToken());
+                                fcmRequest.setTitle("새로운 반응이 있습니다!");
+                                fcmRequest.setBody(user.getNickname() + "님이 회원님의 댓글에 공감했습니다: " + emotionType);
+
+                                notificationProducer.sendNotification(fcmRequest);
+                        }
                 }
         }
 }
