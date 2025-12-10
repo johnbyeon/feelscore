@@ -17,8 +17,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/feelscore?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: ${MYSQL_ID}
-    password: ${MYSQL_PW}
+    username: root
+    password: 1111
 
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
@@ -70,7 +70,7 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
 
-  # ✅ S3 설정 (local)
+  # ??S3 ?�정 (local)
   cloud:
     aws:
       credentials:
@@ -150,7 +150,7 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
 
-  # ✅ S3 설정 (prod)
+  # ??S3 ?�정 (prod)
   cloud:
     aws:
       credentials:
