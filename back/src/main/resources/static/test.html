@@ -170,6 +170,7 @@
             border-radius: 4px;
             background-color: #2d2d2d;
             border-left: 3px solid transparent;
+            color: #e5e7eb;
         }
 
         .log-entry.success {
@@ -299,28 +300,39 @@
                 </div>
                 <button onclick="toggleFollow()">Toggle Follow</button>
             </div>
+
+            <!-- Emotion Filtered Feed Card -->
+            <div class="card">
+                <h2>Emotion Filtered Feed</h2>
+                <div class="form-group">
+                    <select id="feedEmotionType">
+                        <option value="JOY">JOY (기쁨)</option>
+                        <option value="SADNESS">SADNESS (슬픔)</option>
+                        <option value="ANGER">ANGER (분노)</option>
+                        <option value="FEAR">FEAR (두려움)</option>
+                        <option value="SURPRISE">SURPRISE (놀람)</option>
+                    </select>
+                </div>
+                <button onclick="getPostsByEmotion()">Get Feed</button>
+            </div>
         </div>
 
         <div class="section-title">Data & Statistics</div>
         <div class="grid-container">
             <div class="card">
-                <h2>My Notifications</h2>
-                <button onclick="getNotifications()">Fetch Notifications</button>
+                <h2>Notifications</h2>
+                <button onclick="getNotifications()">Get Notifications</button>
             </div>
-
             <div class="card">
-                <h2>My Emotion Dashboard</h2>
-                <button onclick="getMyEmotionStats()">Fetch Emotion Stats</button>
+                <h2>My Emotion Stats</h2>
+                <button onclick="getMyEmotionStats()">Get Stats</button>
+            </div>
+            <div class="card" style="display: flex; align-items: center; justify-content: space-between;">
+                <span>Response Logs</span>
+                <button class="clear-btn" onclick="clearLogs()" style="width: auto;">Clear</button>
             </div>
         </div>
-    </div>
 
-    <!-- Right Panel: Logs -->
-    <div class="log-panel">
-        <div class="log-header">
-            <span>Response Logs</span>
-            <button class="clear-btn" onclick="clearLogs()">Clear</button>
-        </div>
         <div id="logContent" class="log-content">
             <div class="log-entry info">Ready to test...</div>
         </div>
@@ -522,6 +534,22 @@
                 log('My Emotion Stats', data);
             } catch (e) {
                 log('My Emotion Stats Error', e.message, true);
+            }
+        }
+
+        async function getPostsByEmotion() {
+            if (!accessToken) return alert('Login first!');
+            const emotion = document.getElementById('feedEmotionType').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/v1/posts/emotion/${emotion}?page=0&size=10`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await response.json();
+                log(`Feed (${emotion})`, data);
+            } catch (e) {
+                log('Feed Error', e.message, true);
             }
         }
     </script>
