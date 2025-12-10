@@ -1,7 +1,7 @@
 package com.feelscore.back.service;
 
 import com.feelscore.back.dto.ReactionDto;
-import com.feelscore.back.dto.FCMRequestDto;
+import com.feelscore.back.dto.NotificationEventDto;
 import com.feelscore.back.entity.EmotionType;
 import com.feelscore.back.entity.Post;
 import com.feelscore.back.entity.PostReaction;
@@ -76,14 +76,20 @@ public class ReactionService {
             categoryStatsService.updateUserReactionStats(post.getCategory(), emotionType, true);
 
             // 🔹 알림 발송 (내 글에 내가 반응하면 알림 X)
+            // 🔹 알림 발송 (내 글에 내가 반응하면 알림 X)
             Users postWriter = post.getUsers();
-            if (!postWriter.getId().equals(userId) && postWriter.getFcmToken() != null) {
-                com.feelscore.back.dto.FCMRequestDto fcmRequest = new com.feelscore.back.dto.FCMRequestDto();
-                fcmRequest.setTargetToken(postWriter.getFcmToken());
-                fcmRequest.setTitle("새로운 반응이 있습니다!");
-                fcmRequest.setBody(user.getNickname() + "님이 회원님의 게시글에 공감했습니다: " + emotionType);
+            if (!postWriter.getId().equals(userId)) {
+                com.feelscore.back.dto.NotificationEventDto eventDto = com.feelscore.back.dto.NotificationEventDto
+                        .builder()
+                        .recipientId(postWriter.getId())
+                        .senderId(userId)
+                        .type(com.feelscore.back.entity.NotificationType.POST_REACTION)
+                        .relatedId(postId)
+                        .title("새로운 반응이 있습니다!")
+                        .body(user.getNickname() + "님이 회원님의 게시글에 공감했습니다: " + emotionType)
+                        .build();
 
-                notificationProducer.sendNotification(fcmRequest);
+                notificationProducer.sendNotification(eventDto);
             }
         }
     }

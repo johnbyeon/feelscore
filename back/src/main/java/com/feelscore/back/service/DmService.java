@@ -116,11 +116,12 @@ public class DmService {
 
             String notiMessage = String.format("%s님이 메시지를 보냈습니다.", sender.getNickname());
 
-            notificationService.createNotification(
+            notificationService.sendNotification(
+                    sender,
                     receiver,
-                    "DM",
+                    com.feelscore.back.entity.NotificationType.DM,
                     notiMessage,
-                    "/dm/" + thread.getId());
+                    thread.getId());
         }
 
         return message;

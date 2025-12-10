@@ -1,6 +1,6 @@
 package com.feelscore.back.controller;
 
-import com.feelscore.back.dto.FCMRequestDto;
+import com.feelscore.back.dto.NotificationEventDto;
 import com.feelscore.back.service.NotificationProducer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +17,9 @@ public class FCMController {
     private final NotificationProducer notificationProducer;
 
     @PostMapping("/send")
-    public ResponseEntity<String> sendNotification(@RequestBody FCMRequestDto requestDto) {
+    public ResponseEntity<String> sendNotification(@RequestBody com.feelscore.back.dto.NotificationEventDto eventDto) {
         // 큐에 넣기만 하고 바로 응답 (비동기 처리)
-        notificationProducer.sendNotification(requestDto);
+        notificationProducer.sendNotification(eventDto);
         return ResponseEntity.ok("Notification queued successfully");
     }
 }

@@ -1,13 +1,15 @@
 package com.feelscore.back.service;
 
+import com.feelscore.back.dto.NotificationDto;
 import com.feelscore.back.entity.Notification;
+import com.feelscore.back.entity.NotificationType;
 import com.feelscore.back.entity.Users;
 import com.feelscore.back.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -21,38 +23,46 @@ public class NotificationService {
      * 내 알림 목록 조회
      * - 최신순 정렬
      */
-    public List<Notification> getMyNotifications(Long userId) {
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    public Page<NotificationDto.Response> getMyNotifications(Users user, Pageable pageable) {
+        Page<Notification> notifications = notificationRepository.findByRecipientOrderByCreatedAtDesc(user, pageable);
+        return notifications.map(NotificationDto.Response::from);
     }
 
     /**
-     * 알림 생성 (다른 서비스에서 호출)
+     * 알림 발송 (Producer로 이벤트 발행)
+     * - DB 저장은 Consumer에서 처리됨
      */
-    @Transactional
-    public void createNotification(Users user, String type, String message, String relatedUrl) {
-        Notification notification = Notification.create(user, type, message, relatedUrl);
-        notificationRepository.save(notification);
+    public void sendNotification(Users sender, Users recipient, NotificationType type, String content, Long relatedId) {
+        if (recipient.getId().equals(sender.getId())) {
+            return; // 본인에게 알림 발송 X
+        }
 
-        // 🔥 FCM 알림 발송 (토큰이 있는 경우에만)
-        if (user.getFcmToken() != null) {
-            try {
-                com.feelscore.back.dto.FCMRequestDto fcmRequest = new com.feelscore.back.dto.FCMRequestDto();
-                fcmRequest.setTargetToken(user.getFcmToken());
+        com.feelscore.back.dto.NotificationEventDto eventDto = com.feelscore.back.dto.NotificationEventDto.builder()
+                .recipientId(recipient.getId())
+                .senderId(sender.getId())
+                .type(type)
+                .relatedId(relatedId)
+                .title(getTitleByType(type))
+                .body(content)
+                .build();
 
-                // 타입별 제목 설정
-                String title = "새로운 알림";
-                if ("DM".equalsIgnoreCase(type)) {
-                    title = "새로운 메시지";
-                }
+        notificationProducer.sendNotification(eventDto);
+    }
 
-                fcmRequest.setTitle(title);
-                fcmRequest.setBody(message);
-
-                notificationProducer.sendNotification(fcmRequest);
-            } catch (Exception e) {
-                // 알림 발송 실패가 메인 로직(DB 저장)을 방해하면 안 됨
-                System.err.println("Failed to send FCM notification: " + e.getMessage());
-            }
+    private String getTitleByType(NotificationType type) {
+        switch (type) {
+            case DM:
+                return "새로운 메시지";
+            case POST_REACTION:
+                return "새로운 반응이 있습니다!";
+            case COMMENT_REACTION:
+                return "새로운 반응이 있습니다!";
+            case COMMENT:
+                return "새로운 댓글이 달렸습니다!";
+            case FOLLOW:
+                return "새로운 팔로워!";
+            default:
+                return "새로운 알림";
         }
     }
 }
