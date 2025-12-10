@@ -79,4 +79,25 @@ public interface PostEmotionRepository extends JpaRepository<PostEmotion, Long> 
                         "WHERE pe.isAnalyzed = true AND p.status = com.feelscore.back.entity.PostStatus.NORMAL " +
                         "GROUP BY p.category.id")
         List<com.feelscore.back.dto.EmotionSumDto> sumScoresAll();
+
+        // [NEW] 특정 유저의 감정 점수 합계 (Personal Dashboard)
+        @Query("SELECT new com.feelscore.back.dto.EmotionSumDto(" +
+                        "p.users.id, " +
+                        "SUM(pe.scores.joyScore), " +
+                        "SUM(pe.scores.sadnessScore), " +
+                        "SUM(pe.scores.angerScore), " +
+                        "SUM(pe.scores.fearScore), " +
+                        "SUM(pe.scores.disgustScore), " +
+                        "SUM(pe.scores.surpriseScore), " +
+                        "SUM(pe.scores.contemptScore), " +
+                        "SUM(pe.scores.loveScore), " +
+                        "SUM(pe.scores.anticipationScore), " +
+                        "SUM(pe.scores.trustScore), " +
+                        "SUM(pe.scores.neutralScore) " +
+                        ") " +
+                        "FROM PostEmotion pe JOIN pe.post p " +
+                        "WHERE p.users.id = :userId AND pe.isAnalyzed = true AND p.status = com.feelscore.back.entity.PostStatus.NORMAL "
+                        +
+                        "GROUP BY p.users.id")
+        Optional<com.feelscore.back.dto.EmotionSumDto> sumScoresByUserId(@Param("userId") Long userId);
 }

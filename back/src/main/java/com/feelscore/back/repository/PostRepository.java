@@ -64,4 +64,10 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         @Query("SELECT p, pe.dominantEmotion FROM Post p LEFT JOIN PostEmotion pe ON p.id = pe.post.id WHERE p.category.id IN :categoryIds AND p.status = :status")
         Page<Object[]> findByCategory_IdInAndStatusWithEmotion(@Param("categoryIds") List<Long> categoryIds,
                         @Param("status") PostStatus status, Pageable pageable);
+
+        // [NEW] 특정 사용자의 게시글 개수 조회
+        long countByUsers_IdAndStatus(Long userId, PostStatus status);
+
+        // [NEW] 특정 사용자의 전체 게시글 개수 조회 (Status 무관)
+        long countByUsers_Id(Long userId);
 }

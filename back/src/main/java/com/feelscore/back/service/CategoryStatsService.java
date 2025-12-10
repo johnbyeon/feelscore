@@ -122,7 +122,7 @@ public class CategoryStatsService {
         // 각 카테고리별 자신의 직접적인 점수
         java.util.Map<Long, java.util.Map<EmotionType, Long>> selfScoreMap = new java.util.HashMap<>();
         for (com.feelscore.back.dto.EmotionSumDto dto : rawSums) {
-            selfScoreMap.put(dto.getCategoryId(), dto.toMap());
+            selfScoreMap.put(dto.getId(), dto.toMap());
         }
 
         // 3. 최상위 카테고리 로드 및 트리 구성
