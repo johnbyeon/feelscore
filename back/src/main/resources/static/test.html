@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FeelScore API Test Console</title>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-color: #1f2937;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* Left Panel: Controls */
+        .control-panel {
+            flex: 2;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        /* Right Panel: Logs */
+        .log-panel {
+            flex: 1;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            font-size: 1.1rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #374151;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin: 20px 0 10px 0;
+            font-weight: bold;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        /* Log Styles */
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+        }
+
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #2d2d2d;
+            border-left: 3px solid transparent;
+            color: #e5e7eb;
+        }
+
+        .log-entry.success {
+            border-left-color: #50fa7b;
+        }
+
+        .log-entry.error {
+            border-left-color: #ff6b6b;
+        }
+
+        .log-entry.info {
+            border-left-color: #8be9fd;
+        }
+
+        .timestamp {
+            color: #6272a4;
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+        }
+
+        .clear-btn {
+            background-color: #444;
+            width: auto;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+
+        .clear-btn:hover {
+            background-color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Left Panel: Controls -->
+    <div class="control-panel">
+        <h1>FeelScore API Console</h1>
+
+        <div class="section-title">Authentication</div>
+        <div class="card">
+            <h2>Login</h2>
+            <div class="row form-group">
+                <div class="col">
+                    <input type="text" id="email" placeholder="Email" value="commenter@test.com">
+                </div>
+                <div class="col">
+                    <input type="password" id="password" placeholder="Password" value="1234">
+                </div>
+            </div>
+            <button onclick="login()">Login & Get Token</button>
+        </div>
+
+        <div class="section-title">Content Creation</div>
+        <div class="grid-container">
+            <div class="card">
+                <h2>Create Post</h2>
+                <div class="form-group">
+                    <textarea id="postContent" placeholder="What are you feeling?">좋아요 알림 테스트용 게시글입니다.</textarea>
+                </div>
+                <button onclick="createPost()">Post</button>
+            </div>
+
+            <div class="card">
+                <h2>Create Comment</h2>
+                <div class="form-group">
+                    <input type="number" id="targetPostId" placeholder="Target Post ID" value="1">
+                </div>
+                <div class="form-group">
+                    <textarea id="commentContent" placeholder="Comment...">댓글 좋아요 알림 테스트용입니다!</textarea>
+                </div>
+                <button onclick="submitComment()">Comment</button>
+            </div>
+
+            <div class="card">
+                <h2>Send DM</h2>
+                <div class="form-group">
+                    <input type="number" id="dmReceiverId" placeholder="Receiver User ID" value="1">
+                </div>
+                <div class="form-group">
+                    <textarea id="dmContent" placeholder="Message...">안녕하세요! DM 알림 테스트입니다.</textarea>
+                </div>
+                <button onclick="sendDm()">Send Message</button>
+            </div>
+        </div>
+
+        <div class="section-title">Interactions</div>
+        <div class="grid-container">
+            <div class="card">
+                <h2>Post Reaction</h2>
+                <div class="row form-group">
+                    <div class="col">
+                        <input type="number" id="reactPostId" placeholder="Post ID" value="1">
+                    </div>
+                    <div class="col">
+                        <select id="postReactionType">
+                            <option value="JOY">JOY (기쁨)</option>
+                            <option value="SADNESS">SADNESS (슬픔)</option>
+                            <option value="ANGER">ANGER (분노)</option>
+                            <option value="FEAR">FEAR (두려움)</option>
+                            <option value="SURPRISE">SURPRISE (놀람)</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="togglePostReaction()">Toggle Reaction</button>
+            </div>
+
+            <div class="card">
+                <h2>Comment Reaction</h2>
+                <div class="row form-group">
+                    <div class="col">
+                        <input type="number" id="reactCommentId" placeholder="Comment ID" value="1">
+                    </div>
+                    <div class="col">
+                        <select id="commentReactionType">
+                            <option value="JOY">JOY (기쁨)</option>
+                            <option value="SADNESS">SADNESS (슬픔)</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="toggleCommentReaction()">Toggle Reaction</button>
+            </div>
+
+            <div class="card">
+                <h2>Follow User</h2>
+                <div class="form-group">
+                    <input type="number" id="followTargetId" placeholder="Target User ID" value="1">
+                </div>
+                <button onclick="toggleFollow()">Toggle Follow</button>
+            </div>
+
+            <!-- Emotion Filtered Feed Card -->
+            <div class="card">
+                <h2>Emotion Filtered Feed</h2>
+                <div class="form-group">
+                    <select id="feedEmotionType">
+                        <option value="JOY">JOY (기쁨)</option>
+                        <option value="SADNESS">SADNESS (슬픔)</option>
+                        <option value="ANGER">ANGER (분노)</option>
+                        <option value="FEAR">FEAR (두려움)</option>
+                        <option value="SURPRISE">SURPRISE (놀람)</option>
+                    </select>
+                </div>
+                <button onclick="getPostsByEmotion()">Get Feed</button>
+            </div>
+        </div>
+
+        <div class="section-title">Data & Statistics</div>
+        <div class="grid-container">
+            <div class="card">
+                <h2>Notifications</h2>
+                <button onclick="getNotifications()">Get Notifications</button>
+            </div>
+            <div class="card">
+                <h2>My Emotion Stats</h2>
+                <button onclick="getMyEmotionStats()">Get Stats</button>
+            </div>
+            <div class="card" style="display: flex; align-items: center; justify-content: space-between;">
+                <span>Response Logs</span>
+                <button class="clear-btn" onclick="clearLogs()" style="width: auto;">Clear</button>
+            </div>
+        </div>
+
+        <div id="logContent" class="log-content">
+            <div class="log-entry info">Ready to test...</div>
+        </div>
+    </div>
+
+    <script>
+        let accessToken = null;
+        let userId = null;
+        const BASE_URL = 'http://localhost:8080/api';
+
+        function log(title, data, isError = false) {
+            const logContent = document.getElementById('logContent');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${isError ? 'error' : 'success'}`;
+
+            const time = new Date().toLocaleTimeString();
+            const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+
+            entry.innerHTML = `
+                <div class="timestamp">[${time}] ${title}</div>
+                <div>${content}</div>
+            `;
+
+            logContent.insertBefore(entry, logContent.firstChild);
+        }
+
+        function clearLogs() {
+            document.getElementById('logContent').innerHTML = '';
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    accessToken = data.access_token;
+                    userId = data.id;
+                    log('Login Success', `User ID: ${userId}\nToken: ${accessToken.substring(0, 20)}...`);
+                } else {
+                    throw new Error(data.error_description || 'Login failed');
+                }
+            } catch (e) {
+                log('Login Failed', e.message, true);
+            }
+        }
+
+        async function createPost() {
+            if (!accessToken) return alert('Login first!');
+            const content = document.getElementById('postContent').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/v1/posts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                    body: JSON.stringify({ content: content, categoryId: 1 })
+                });
+                const data = await response.json();
+                log('Create Post', data);
+            } catch (e) {
+                log('Create Post Error', e.message, true);
+            }
+        }
+
+        async function submitComment() {
+            if (!accessToken) return alert('Login first!');
+            const postId = document.getElementById('targetPostId').value;
+            const content = document.getElementById('commentContent').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/posts/${postId}/comments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                    body: JSON.stringify({ content: content })
+                });
+                const data = await response.json();
+                log('Create Comment', data);
+            } catch (e) {
+                log('Create Comment Error', e.message, true);
+            }
+        }
+
+        async function sendDm() {
+            if (!accessToken) return alert('Login first!');
+            const receiverId = document.getElementById('dmReceiverId').value;
+            const content = document.getElementById('dmContent').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/dm/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                    body: JSON.stringify({ receiverId: receiverId, content: content })
+                });
+                const data = await response.json();
+                log('Send DM', data);
+            } catch (e) {
+                log('Send DM Error', e.message, true);
+            }
+        }
+
+        async function togglePostReaction() {
+            if (!accessToken) return alert('Login first!');
+            const postId = document.getElementById('reactPostId').value;
+            const emotion = document.getElementById('postReactionType').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/posts/${postId}/react`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                    body: JSON.stringify({ emotionType: emotion })
+                });
+                if (response.ok) {
+                    log('Post Reaction', `Success! Toggled ${emotion} on Post ${postId}`);
+                } else {
+                    const text = await response.text();
+                    log('Post Reaction Error', text, true);
+                }
+            } catch (e) {
+                log('Post Reaction Error', e.message, true);
+            }
+        }
+
+        async function toggleCommentReaction() {
+            if (!accessToken) return alert('Login first!');
+            const commentId = document.getElementById('reactCommentId').value;
+            const emotion = document.getElementById('commentReactionType').value;
+            const postId = document.getElementById('targetPostId').value || 1; // Fallback to 1
+
+            try {
+                const response = await fetch(`${BASE_URL}/posts/${postId}/comments/${commentId}/react`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                    body: JSON.stringify({ emotionType: emotion })
+                });
+                if (response.ok) {
+                    log('Comment Reaction', `Success! Toggled ${emotion} on Comment ${commentId}`);
+                } else {
+                    const text = await response.text();
+                    log('Comment Reaction Error', text, true);
+                }
+            } catch (e) {
+                log('Comment Reaction Error', e.message, true);
+            }
+        }
+
+        async function toggleFollow() {
+            if (!accessToken) return alert('Login first!');
+            const targetId = document.getElementById('followTargetId').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/follows/${targetId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                    body: {}
+                });
+                if (response.ok) {
+                    const isFollowing = await response.json();
+                    log('Follow', isFollowing ? `Followed User ${targetId}!` : `Unfollowed User ${targetId}.`);
+                } else {
+                    const text = await response.text();
+                    log('Follow Error', text, true);
+                }
+            } catch (e) {
+                log('Follow Error', e.message, true);
+            }
+        }
+
+        async function getNotifications() {
+            if (!accessToken) return alert('Login first!');
+
+            try {
+                const response = await fetch(`${BASE_URL}/notifications?page=0&size=10`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await response.json();
+                log('Get Notifications', data);
+            } catch (e) {
+                log('Get Notifications Error', e.message, true);
+            }
+        }
+
+        async function getMyEmotionStats() {
+            if (!accessToken) return alert('Login first!');
+
+            try {
+                const response = await fetch(`${BASE_URL}/users/me/emotion-stats`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await response.json();
+                log('My Emotion Stats', data);
+            } catch (e) {
+                log('My Emotion Stats Error', e.message, true);
+            }
+        }
+
+        async function getPostsByEmotion() {
+            if (!accessToken) return alert('Login first!');
+            const emotion = document.getElementById('feedEmotionType').value;
+
+            try {
+                const response = await fetch(`${BASE_URL}/v1/posts/emotion/${emotion}?page=0&size=10`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await response.json();
+                log(`Feed (${emotion})`, data);
+            } catch (e) {
+                log('Feed Error', e.message, true);
+            }
+        }
+    </script>
+</body>
+
+</html>

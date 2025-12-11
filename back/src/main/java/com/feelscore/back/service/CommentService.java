@@ -46,14 +46,24 @@ public class CommentService {
                 commentRepository.save(comment);
 
                 // 🔹 알림 발송 로직 (내 글에 내가 쓴 댓글은 알림 X)
-                Users postWriter = post.getUsers();
-                if (!postWriter.getId().equals(userId) && postWriter.getFcmToken() != null) {
-                        com.feelscore.back.dto.FCMRequestDto fcmRequest = new com.feelscore.back.dto.FCMRequestDto();
-                        fcmRequest.setTargetToken(postWriter.getFcmToken());
-                        fcmRequest.setTitle("새로운 댓글이 달렸습니다!");
-                        fcmRequest.setBody(user.getNickname() + "님이 댓글을 남겼습니다: " + content);
+                try {
+                        Users postWriter = post.getUsers();
+                        if (postWriter != null && !postWriter.getId().equals(userId)) {
+                                com.feelscore.back.dto.NotificationEventDto eventDto = com.feelscore.back.dto.NotificationEventDto
+                                                .builder()
+                                                .recipientId(postWriter.getId())
+                                                .senderId(userId)
+                                                .type(com.feelscore.back.entity.NotificationType.COMMENT)
+                                                .relatedId(postId)
+                                                .title("새로운 댓글이 달렸습니다!")
+                                                .body(user.getNickname() + "님이 댓글을 남겼습니다: " + content)
+                                                .build();
 
-                        notificationProducer.sendNotification(fcmRequest);
+                                notificationProducer.sendNotification(eventDto);
+                        }
+                } catch (Exception e) {
+                        System.err.println("Failed to send comment notification: " + e.getMessage());
+                        e.printStackTrace();
                 }
 
                 return CommentDto.Response.from(comment);
@@ -112,6 +122,27 @@ public class CommentService {
                                         .emotionType(emotionType)
                                         .build();
                         commentReactionRepository.save(reaction);
+
+                        // 🔹 알림 발송 (내 댓글에 내가 반응하면 알림 X)
+                        try {
+                                Users commentWriter = comment.getUsers();
+                                if (commentWriter != null && !commentWriter.getId().equals(userId)) {
+                                        com.feelscore.back.dto.NotificationEventDto eventDto = com.feelscore.back.dto.NotificationEventDto
+                                                        .builder()
+                                                        .recipientId(commentWriter.getId())
+                                                        .senderId(userId)
+                                                        .type(com.feelscore.back.entity.NotificationType.COMMENT_REACTION)
+                                                        .relatedId(commentId)
+                                                        .title("새로운 반응이 있습니다!")
+                                                        .body(user.getNickname() + "님이 회원님의 댓글에 공감했습니다: " + emotionType)
+                                                        .build();
+
+                                        notificationProducer.sendNotification(eventDto);
+                                }
+                        } catch (Exception e) {
+                                System.err.println("Failed to send comment reaction notification: " + e.getMessage());
+                                e.printStackTrace();
+                        }
                 }
         }
 }

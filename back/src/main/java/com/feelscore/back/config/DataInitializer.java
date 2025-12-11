@@ -1,6 +1,6 @@
 package com.feelscore.back.config;
 
-import com.feelscore.back.entity.Category;
+import com.feelscore.back.entity.*;
 import com.feelscore.back.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
@@ -16,6 +16,9 @@ public class DataInitializer implements CommandLineRunner {
 
     private final CategoryRepository categoryRepository;
     private final com.feelscore.back.service.CategoryVersionService categoryVersionService;
+    private final com.feelscore.back.repository.UserRepository userRepository;
+    private final com.feelscore.back.repository.PostRepository postRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -80,5 +83,51 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         System.out.println("✅ Dummy categories initialized (Expanded Korean Version).");
+
+        initializeTestUsersAndPost();
+    }
+
+    private void initializeTestUsersAndPost() {
+        // 1. 유저 A (글쓴이)
+        Users writer = userRepository.findByEmail("writer@test.com")
+                .orElseGet(() -> Users.builder()
+                        .email("writer@test.com")
+                        .nickname("Writer")
+                        .role(Role.USER)
+                        .build());
+
+        // 비밀번호 & 토큰 강제 업데이트 (이미 존재하더라도 덮어쓰기)
+        writer.setPassword(passwordEncoder.encode("1234"));
+        // writer.updateFcmToken("TEST_TOKEN_WRITER"); // Cleanup: Remove hardcoded
+        // token
+        userRepository.save(writer);
+
+        // 2. 유저 B (댓글러)
+        Users commenter = userRepository.findByEmail("commenter@test.com")
+                .orElseGet(() -> Users.builder()
+                        .email("commenter@test.com")
+                        .nickname("Commenter")
+                        .role(Role.USER)
+                        .build());
+
+        // 비밀번호 강제 업데이트
+        commenter.setPassword(passwordEncoder.encode("1234"));
+        userRepository.save(commenter);
+
+        // 3. 게시글 작성 (작성자: Writer)
+        if (postRepository.count() == 0) {
+            Category category = categoryRepository.findAll().stream().findFirst().orElseThrow();
+            Post post = Post.builder()
+                    .content("이것은 테스트 게시글입니다. 댓글을 달아보세요!")
+                    .users(writer)
+                    .category(category)
+                    .build();
+            postRepository.save(post);
+            System.out.println("✅ Test Post initialized (ID: " + post.getId() + ")");
+        }
+
+        System.out.println("✅ Test Users initialized.");
+        System.out.println("   - Writer: writer@test.com / 1234");
+        System.out.println("   - Commenter: commenter@test.com / 1234");
     }
 }

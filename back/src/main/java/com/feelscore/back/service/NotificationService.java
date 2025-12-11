@@ -1,13 +1,15 @@
 package com.feelscore.back.service;
 
+import com.feelscore.back.dto.NotificationDto;
 import com.feelscore.back.entity.Notification;
+import com.feelscore.back.entity.NotificationType;
 import com.feelscore.back.entity.Users;
 import com.feelscore.back.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -15,21 +17,52 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationProducer notificationProducer;
 
     /**
      * 내 알림 목록 조회
      * - 최신순 정렬
      */
-    public List<Notification> getMyNotifications(Long userId) {
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    public Page<NotificationDto.Response> getMyNotifications(Users user, Pageable pageable) {
+        Page<Notification> notifications = notificationRepository.findByRecipientOrderByCreatedAtDesc(user, pageable);
+        return notifications.map(NotificationDto.Response::from);
     }
 
     /**
-     * 알림 생성 (다른 서비스에서 호출)
+     * 알림 발송 (Producer로 이벤트 발행)
+     * - DB 저장은 Consumer에서 처리됨
      */
-    @Transactional
-    public void createNotification(Users user, String type, String message, String relatedUrl) {
-        Notification notification = Notification.create(user, type, message, relatedUrl);
-        notificationRepository.save(notification);
+    public void sendNotification(Users sender, Users recipient, NotificationType type, String content, Long relatedId) {
+        if (recipient.getId().equals(sender.getId())) {
+            return; // 본인에게 알림 발송 X
+        }
+
+        com.feelscore.back.dto.NotificationEventDto eventDto = com.feelscore.back.dto.NotificationEventDto.builder()
+                .recipientId(recipient.getId())
+                .senderId(sender.getId())
+                .type(type)
+                .relatedId(relatedId)
+                .title(getTitleByType(type))
+                .body(content)
+                .build();
+
+        notificationProducer.sendNotification(eventDto);
+    }
+
+    private String getTitleByType(NotificationType type) {
+        switch (type) {
+            case DM:
+                return "새로운 메시지";
+            case POST_REACTION:
+                return "새로운 반응이 있습니다!";
+            case COMMENT_REACTION:
+                return "새로운 반응이 있습니다!";
+            case COMMENT:
+                return "새로운 댓글이 달렸습니다!";
+            case FOLLOW:
+                return "새로운 팔로워!";
+            default:
+                return "새로운 알림";
+        }
     }
 }

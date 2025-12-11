@@ -1,6 +1,7 @@
 package com.feelscore.back.service;
 
 import com.feelscore.back.dto.FollowDto;
+import com.feelscore.back.dto.NotificationEventDto;
 import com.feelscore.back.dto.UsersDto;
 import com.feelscore.back.entity.Follow;
 import com.feelscore.back.entity.Users;
@@ -25,6 +26,7 @@ public class FollowService {
         private final FollowRepository followRepository;
         private final UserRepository userRepository;
         private final BlockRepository blockRepository;
+        private final NotificationProducer notificationProducer; // 🔹 알림 발송자 주입
 
         /**
          * 팔로우 토글 (팔로우 <-> 언팔로우)
@@ -57,6 +59,22 @@ public class FollowService {
                                         .following(targetUser)
                                         .build();
                         followRepository.save(follow);
+
+                        // 🔹 알림 발송
+                        if (targetUser.getFcmToken() != null) {
+                                com.feelscore.back.dto.NotificationEventDto eventDto = com.feelscore.back.dto.NotificationEventDto
+                                                .builder()
+                                                .recipientId(targetUser.getId())
+                                                .senderId(currentUser.getId())
+                                                .type(com.feelscore.back.entity.NotificationType.FOLLOW)
+                                                .relatedId(currentUser.getId()) // 팔로우는 관련 ID가 팔로워(나)
+                                                .title("새로운 팔로워!")
+                                                .body(currentUser.getNickname() + "님이 회원님을 팔로우하기 시작했습니다.")
+                                                .build();
+
+                                notificationProducer.sendNotification(eventDto);
+                        }
+
                         return true; // 팔로우 됨
                 }
         }

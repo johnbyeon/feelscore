@@ -1,59 +1,54 @@
 package com.feelscore.back.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@EntityListeners(AuditingEntityListener.class)
-@Table(name = "notification")
-public class Notification {
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "notifications")
+public class Notification extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "notification_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private Users user; // 알림 받는 사람
+    @JoinColumn(name = "recipient_id", nullable = false)
+    private Users recipient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sender_id", nullable = false)
+    private Users sender;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private NotificationType type;
 
     @Column(nullable = false)
-    private String type; // 알림 타입 (예: "DM", "FOLLOW")
+    private String content;
 
-    @Column(nullable = false)
-    private String message; // 알림 내용
+    @Column(name = "related_id")
+    private Long relatedId; // PostId, CommentId, etc.
 
-    private String relatedUrl; // 클릭 시 이동할 경로
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead;
 
-    @Column(nullable = false)
-    private boolean isRead; // 읽음 여부
-
-    @CreatedDate
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
-
-    // 읽음 처리 메서드
-    public void read() {
-        this.isRead = true;
+    @Builder
+    public Notification(Users recipient, Users sender, NotificationType type, String content, Long relatedId) {
+        this.recipient = recipient;
+        this.sender = sender;
+        this.type = type;
+        this.content = content;
+        this.relatedId = relatedId;
+        this.isRead = false;
     }
 
-    public static Notification create(Users user, String type, String message, String relatedUrl) {
-        return Notification.builder()
-                .user(user)
-                .type(type)
-                .message(message)
-                .relatedUrl(relatedUrl)
-                .isRead(false)
-                .build();
+    public void markAsRead() {
+        this.isRead = true;
     }
 }

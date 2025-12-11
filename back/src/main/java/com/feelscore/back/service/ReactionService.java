@@ -1,6 +1,7 @@
 package com.feelscore.back.service;
 
 import com.feelscore.back.dto.ReactionDto;
+import com.feelscore.back.dto.NotificationEventDto;
 import com.feelscore.back.entity.EmotionType;
 import com.feelscore.back.entity.Post;
 import com.feelscore.back.entity.PostReaction;
@@ -27,6 +28,7 @@ public class ReactionService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final CategoryStatsService categoryStatsService; // Added dependency
+    private final NotificationProducer notificationProducer; // 🔹 알림 발송자 주입
 
     /**
      * 토글 리액션: 이미 같은 감정이면 삭제, 다른 감정이면 수정, 없으면 생성
@@ -72,6 +74,23 @@ public class ReactionService {
             postReactionRepository.save(newReaction);
             // Update Stats: Add
             categoryStatsService.updateUserReactionStats(post.getCategory(), emotionType, true);
+
+            // 🔹 알림 발송 (내 글에 내가 반응하면 알림 X)
+            // 🔹 알림 발송 (내 글에 내가 반응하면 알림 X)
+            Users postWriter = post.getUsers();
+            if (!postWriter.getId().equals(userId)) {
+                com.feelscore.back.dto.NotificationEventDto eventDto = com.feelscore.back.dto.NotificationEventDto
+                        .builder()
+                        .recipientId(postWriter.getId())
+                        .senderId(userId)
+                        .type(com.feelscore.back.entity.NotificationType.POST_REACTION)
+                        .relatedId(postId)
+                        .title("새로운 반응이 있습니다!")
+                        .body(user.getNickname() + "님이 회원님의 게시글에 공감했습니다: " + emotionType)
+                        .build();
+
+                notificationProducer.sendNotification(eventDto);
+            }
         }
     }
 

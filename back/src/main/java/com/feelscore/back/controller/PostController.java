@@ -86,6 +86,22 @@ public class PostController {
     }
 
     /**
+     * 감정별 게시글 목록 조회 (Emotion Filtered Feed)
+     * GET /api/v1/posts/emotion/{emotionType}
+     *
+     * @param emotionType 조회할 감정 타입 (JOY, SADNESS, ANGER, etc.)
+     * @param pageable    페이징 정보
+     * @return 게시글 목록 응답 DTO
+     */
+    @GetMapping("/emotion/{emotionType}")
+    public ResponseEntity<Page<ListResponse>> getPostsByEmotion(
+            @PathVariable com.feelscore.back.entity.EmotionType emotionType,
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<ListResponse> responses = postService.getPostsByEmotion(emotionType, pageable);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
      * 게시글 수정
      * PUT /api/v1/posts/{postId}
      *

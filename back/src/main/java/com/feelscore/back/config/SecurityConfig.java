@@ -90,7 +90,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/join", "/api/auth/login", "/api/auth/refresh")
                         .permitAll()
-                        .requestMatchers("/error").permitAll()
+                        .requestMatchers("/error", "/test.html").permitAll()
 
                         .requestMatchers(
                                 "/oauth2/**",

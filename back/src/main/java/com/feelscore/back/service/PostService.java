@@ -123,6 +123,25 @@ public class PostService {
         });
     }
 
+    public Page<ListResponse> getPostsByEmotion(com.feelscore.back.entity.EmotionType emotionType, Pageable pageable) {
+        Page<Object[]> results = postRepository.findByEmotion(emotionType, PostStatus.NORMAL, pageable);
+        return results.map(result -> {
+            Post post = (Post) result[0];
+            Object emotionObj = result[1];
+            String emotion = (emotionObj != null) ? emotionObj.toString() : null;
+            Long commentCount = commentRepository.countByPost(post);
+            List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
+            java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
+            for (Object[] row : reactionObjs) {
+                com.feelscore.back.entity.EmotionType type = (com.feelscore.back.entity.EmotionType) row[0];
+                Long count = (row[1] instanceof Number) ? ((Number) row[1]).longValue() : 0L;
+                reactionCounts.put(type, count);
+            }
+
+            return ListResponse.from(post, emotion, commentCount, reactionCounts);
+        });
+    }
+
     @Transactional
     public Response updatePost(Long postId, @Valid UpdateRequest request, Long userId) {
         Post post = postRepository.findById(postId)

@@ -11,7 +11,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 public class EmotionSumDto {
-    private Long categoryId;
+    private Long id; // Category ID or User ID depending on context
     private Long joy;
     private Long sadness;
     private Long anger;
@@ -24,9 +24,9 @@ public class EmotionSumDto {
     private Long trust;
     private Long neutral;
 
-    public EmotionSumDto(Long categoryId, Long joy, Long sadness, Long anger, Long fear, Long disgust,
+    public EmotionSumDto(Long id, Long joy, Long sadness, Long anger, Long fear, Long disgust,
             Long surprise, Long contempt, Long love, Long anticipation, Long trust, Long neutral) {
-        this.categoryId = categoryId;
+        this.id = id;
         this.joy = joy != null ? joy : 0L;
         this.sadness = sadness != null ? sadness : 0L;
         this.anger = anger != null ? anger : 0L;
