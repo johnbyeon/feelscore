@@ -10,4 +10,8 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     List<Comment> findByPostOrderByCreatedAtAsc(Post post);
 
     long countByPost(Post post);
+
+    List<Comment> findAllByUsers(com.feelscore.back.entity.Users users);
+
+    void deleteAllByPost(Post post);
 }

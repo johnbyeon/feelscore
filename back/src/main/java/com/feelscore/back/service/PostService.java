@@ -31,6 +31,9 @@ public class PostService {
     private final PostAnalysisProducer postAnalysisProducer;
     private final com.feelscore.back.repository.PostReactionRepository postReactionRepository;
     private final com.feelscore.back.repository.CommentRepository commentRepository;
+    private final com.feelscore.back.repository.PostEmotionRepository postEmotionRepository;
+    private final S3Service s3Service; // Inject S3Service
+    private final CommentService commentService;
 
     @Transactional
     public Response createPost(@Valid CreateRequest request, Long userId) {
@@ -171,5 +174,34 @@ public class PostService {
         }
 
         post.setStatus(PostStatus.DELETED); // Post 엔티티에 setStatus 메서드 필요
+    }
+
+    @Transactional
+    public void deleteAllPostsByUser(Long userId) {
+        // 1. 유저가 작성한 모든 게시글 조회
+        List<Post> posts = postRepository.findAllByUsers_Id(userId);
+
+        for (Post post : posts) {
+            // 2. 게시글에 달린 리액션 삭제
+            postReactionRepository.deleteAllByPost(post);
+
+            // 3. 게시글에 달린 댓글 삭제 (댓글 리액션 포함)
+            commentService.deleteAllCommentsByPost(post);
+
+            // 4. 감정 분석 데이터 삭제 (FK 제약조건 방지)
+            postEmotionRepository.deleteByPost(post);
+
+            // 5. S3 이미지 삭제 (이미지가 있는 경우)
+            if (post.getImageUrl() != null && !post.getImageUrl().isBlank()) {
+                try {
+                    s3Service.deleteFile(post.getImageUrl());
+                } catch (Exception e) {
+                    System.err.println("Failed to delete post image from S3: " + e.getMessage());
+                }
+            }
+
+            // 6. 게시글 삭제 (Hard Delete)
+            postRepository.delete(post);
+        }
     }
 }

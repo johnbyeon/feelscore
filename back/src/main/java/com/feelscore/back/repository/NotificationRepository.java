@@ -8,4 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     Page<Notification> findByRecipientOrderByCreatedAtDesc(Users recipient, Pageable pageable);
+
+    void deleteByRecipient(Users recipient);
+
+    void deleteBySender(Users sender);
 }
