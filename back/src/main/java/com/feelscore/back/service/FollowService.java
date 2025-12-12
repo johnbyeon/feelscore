@@ -136,4 +136,11 @@ public class FollowService {
                 private String nickname;
                 private String email;
         }
+
+        @Transactional
+        public void deleteAllFollowsByUser(Long userId) {
+                Users user = userRepository.findById(userId).orElseThrow();
+                followRepository.deleteByFollower(user);
+                followRepository.deleteByFollowing(user);
+        }
 }

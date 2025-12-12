@@ -34,4 +34,6 @@ public interface DmThreadMemberRepository extends JpaRepository<DmThreadMember, 
      * 해당 쓰레드에 유저가 참여중인지 확인 (권한 체크용)
      */
     boolean existsByThreadIdAndUserId(Long threadId, Long userId);
+
+    void deleteByUser(com.feelscore.back.entity.Users user);
 }

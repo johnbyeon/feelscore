@@ -36,6 +36,7 @@ public class DmService {
     private final UserRepository userRepository;
     private final BlockRepository blockRepository;
     private final NotificationService notificationService;
+    private final S3Service s3Service;
 
     /**
      * DM 메시지 보내기
@@ -317,5 +318,31 @@ public class DmService {
     private Users findUser(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("유저를 찾을 수 없습니다. id=" + id));
+    }
+
+    @Transactional
+    public void deleteAllDmsByUser(Long userId) {
+        Users user = userRepository.findById(userId).orElseThrow();
+
+        // 1. DmThread의 lastMessage가 내가 보낸 메시지라면 null로 설정 (FK 제약조건 방지)
+        dmThreadRepository.setLastMessageNullBySender(user);
+
+        // 2. 내가 보낸 메시지 조회 및 S3 이미지 삭제
+        List<DmMessage> messages = dmMessageRepository.findBySender(user);
+        for (DmMessage message : messages) {
+            if (message.getImageUrl() != null && !message.getImageUrl().isBlank()) {
+                try {
+                    s3Service.deleteFile(message.getImageUrl());
+                } catch (Exception e) {
+                    System.err.println("Failed to delete DM image from S3: " + e.getMessage());
+                }
+            }
+        }
+
+        // 3. 메시지 삭제
+        dmMessageRepository.deleteAll(messages);
+
+        // 4. 내가 참여한 대화방 멤버십 삭제
+        dmThreadMemberRepository.deleteByUser(user);
     }
 }

@@ -96,7 +96,10 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/oauth2/authorization/**",
-                                "/api/category-versions/**")
+                                "/api/category-versions/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html")
                         .permitAll()
 
                         // S3 유저/관리자 엔드포인트는 인증만 되면 접근 허용 (세부 권한은 @PreAuthorize에서)

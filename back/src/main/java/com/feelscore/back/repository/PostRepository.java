@@ -76,4 +76,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         Page<Object[]> findByEmotion(@Param("emotionType") com.feelscore.back.entity.EmotionType emotionType,
                         @Param("status") PostStatus status,
                         Pageable pageable);
+
+        List<Post> findAllByUsers_Id(Long userId);
 }

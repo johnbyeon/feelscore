@@ -145,4 +145,34 @@ public class CommentService {
                         }
                 }
         }
+
+        @Transactional
+        public void deleteAllCommentsByUser(Long userId) {
+                Users user = userRepository.findById(userId).orElseThrow();
+                List<Comment> comments = commentRepository.findAllByUsers(user);
+
+                for (Comment comment : comments) {
+                        // 댓글에 달린 리액션 삭제
+                        commentReactionRepository.deleteAllByComment(comment);
+                        // 댓글 삭제
+                        commentRepository.delete(comment);
+                }
+        }
+
+        @Transactional
+        public void deleteAllCommentReactionsByUser(Long userId) {
+                Users user = userRepository.findById(userId).orElseThrow();
+                commentReactionRepository.deleteByUsers(user);
+        }
+
+        @Transactional
+        public void deleteAllCommentsByPost(Post post) {
+                List<Comment> comments = commentRepository.findByPostOrderByCreatedAtAsc(post);
+                for (Comment comment : comments) {
+                        // 댓글에 달린 리액션 삭제
+                        commentReactionRepository.deleteAllByComment(comment);
+                        // 댓글 삭제
+                        commentRepository.delete(comment);
+                }
+        }
 }

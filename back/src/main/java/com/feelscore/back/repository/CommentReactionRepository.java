@@ -16,4 +16,8 @@ public interface CommentReactionRepository extends JpaRepository<CommentReaction
 
     @Query("SELECT r.emotionType, COUNT(r) FROM CommentReaction r WHERE r.comment = :comment GROUP BY r.emotionType")
     List<Object[]> countReactionsByComment(@Param("comment") Comment comment);
+
+    void deleteByUsers(Users users);
+
+    void deleteAllByComment(Comment comment);
 }

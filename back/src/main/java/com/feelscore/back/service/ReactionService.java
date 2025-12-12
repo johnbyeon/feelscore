@@ -1,7 +1,7 @@
 package com.feelscore.back.service;
 
 import com.feelscore.back.dto.ReactionDto;
-import com.feelscore.back.dto.NotificationEventDto;
+import com.feelscore.back.dto.ReactionDto;
 import com.feelscore.back.entity.EmotionType;
 import com.feelscore.back.entity.Post;
 import com.feelscore.back.entity.PostReaction;
@@ -125,5 +125,11 @@ public class ReactionService {
                 .reactionCounts(counts)
                 .myReaction(myReaction)
                 .build();
+    }
+
+    @Transactional
+    public void deleteAllPostReactionsByUser(Long userId) {
+        Users user = userRepository.findById(userId).orElseThrow();
+        postReactionRepository.deleteByUsers(user);
     }
 }

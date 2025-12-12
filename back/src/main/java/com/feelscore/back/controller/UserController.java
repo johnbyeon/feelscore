@@ -94,4 +94,29 @@ public class UserController {
 
         return ResponseEntity.ok().build();
     }
+
+    private final com.feelscore.back.service.UserService userService;
+
+    /**
+     * 회원 탈퇴
+     * DELETE /api/user
+     */
+    @RequestMapping(method = RequestMethod.DELETE)
+    public ResponseEntity<?> deleteUser(Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            Users user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+            userService.withdraw(user.getId());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                            "error", e.getClass().getName() + ": " + e.getMessage(),
+                            "trace",
+                            e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : "No stack trace"));
+        }
+    }
 }

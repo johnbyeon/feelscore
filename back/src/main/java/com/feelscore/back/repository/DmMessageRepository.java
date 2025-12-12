@@ -20,4 +20,8 @@ public interface DmMessageRepository extends JpaRepository<DmMessage, Long> {
      * - size: 한 번에 불러올 개수
      */
     Page<DmMessage> findByThreadIdOrderByCreatedAtAsc(Long threadId, Pageable pageable);
+
+    void deleteBySender(com.feelscore.back.entity.Users sender);
+
+    List<DmMessage> findBySender(com.feelscore.back.entity.Users sender);
 }
