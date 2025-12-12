@@ -36,3 +36,4 @@ Evaluate/.venv/
 Evaluate/__pycache__/
 *.pyc
 .env
+back/src/main/resources/firebase-service-account.json

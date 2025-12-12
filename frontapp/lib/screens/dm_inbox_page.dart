@@ -1,5 +1,7 @@
+import 'dart:async'; // Added
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart'; // Added
 import 'dm_chat_page.dart';
 
 class DmInboxPage extends StatefulWidget {
@@ -10,40 +12,74 @@ class DmInboxPage extends StatefulWidget {
 }
 
 class _DmInboxPageState extends State<DmInboxPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
   late TabController _tabController;
 
   List<dynamic> _inbox = [];
   List<dynamic> _requests = [];
   bool _isLoading = true;
+  StreamSubscription? _fcmSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this);
     _fetchData();
+
+    // Listen for incoming messages to refresh Inbox
+    _fcmSubscription = FCMService().onMessageReceived.listen((_) async {
+      print('DmInboxPage: Received message notification, refreshing list...');
+      // Wait a bit to ensure backend DB is updated
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) _fetchData();
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _fcmSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      print('DmInboxPage: App resumed, refreshing list...');
+      _fetchData();
+    }
+  }
+
   Future<void> _fetchData() async {
-    setState(() => _isLoading = true);
+    // Only show loading if empty, otherwise silent update
+    if (_inbox.isEmpty && _requests.isEmpty) {
+      if (mounted) setState(() => _isLoading = true);
+    }
+
     try {
       final inbox = await _apiService.getDmInbox();
+      print('DEBUG: Inbox fetched. Item count: ${inbox.length}');
+      if (inbox.isNotEmpty) {
+        for (var t in inbox) {
+          print(
+            'DEBUG: Thread ${t['threadId']} unreadCount: ${t['unreadCount']}',
+          );
+        }
+      }
       final requests = await _apiService.getDmRequests();
-      setState(() {
-        _inbox = inbox;
-        _requests = requests;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _inbox = inbox;
+          _requests = requests;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error fetching DM data: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -83,7 +119,7 @@ class _DmInboxPageState extends State<DmInboxPage>
             Icon(
               isRequest ? Icons.mail_outline : Icons.chat_bubble_outline,
               size: 64,
-              color: Colors.grey[300],
+              color: Colors.grey[700],
             ),
             const SizedBox(height: 16),
             Text(
@@ -137,7 +173,7 @@ class _DmInboxPageState extends State<DmInboxPage>
     return ListTile(
       leading: CircleAvatar(
         radius: 24,
-        backgroundColor: Colors.grey[300],
+        backgroundColor: Colors.grey[800],
         backgroundImage:
             otherUserProfileUrl != null
                 ? NetworkImage(
@@ -176,7 +212,7 @@ class _DmInboxPageState extends State<DmInboxPage>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
+                color: unreadCount > 0 ? Colors.white : Colors.grey[500],
                 fontWeight:
                     unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
               ),

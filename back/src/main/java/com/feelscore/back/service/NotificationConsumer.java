@@ -51,6 +51,16 @@ public class NotificationConsumer {
             fcmRequest.setTitle(eventDto.getTitle());
             fcmRequest.setBody(eventDto.getBody());
 
+            java.util.Map<String, String> data = new java.util.HashMap<>();
+            data.put("senderId", String.valueOf(sender.getId()));
+            if (eventDto.getRelatedId() != null) {
+                data.put("threadId", String.valueOf(eventDto.getRelatedId()));
+            }
+            // Add notification type
+            data.put("type", eventDto.getType() != null ? eventDto.getType().toString() : "");
+
+            fcmRequest.setData(data);
+
             String response = fcmService.sendNotification(fcmRequest);
             System.out.println("FCM Response: " + response);
         }

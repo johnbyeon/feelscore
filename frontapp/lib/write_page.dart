@@ -82,13 +82,13 @@ class _WritePageState extends State<WritePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      // backgroundColor: Theme.of(context).colorScheme.surface, // Removed to use global scaffoldBackgroundColor
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         title: Text(
-          'Emotion Write',
+          '게시글 작성하기',
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
@@ -107,7 +107,7 @@ class _WritePageState extends State<WritePage> {
                   children: [
                     // Category Section
                     Text(
-                      "Category",
+                      "카테고리",
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.bold,
@@ -125,7 +125,7 @@ class _WritePageState extends State<WritePage> {
                             controller: _categoryController,
                             style: Theme.of(context).textTheme.bodyLarge,
                             decoration: InputDecoration(
-                              hintText: '#Emotion (e.g. #Joy)',
+                              hintText: '카테고리를 검색하세요.ex(#사회, 또는 사회)',
                               prefixIcon: Icon(
                                 Icons.tag_rounded,
                                 color: Theme.of(context).colorScheme.primary,
@@ -182,10 +182,7 @@ class _WritePageState extends State<WritePage> {
                     const SizedBox(height: 32),
 
                     // Image Section
-                    Text(
-                      "Photo",
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
+                    Text("사진", style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(height: 8),
                     GestureDetector(
                       onTap: _pickImage,
@@ -193,9 +190,8 @@ class _WritePageState extends State<WritePage> {
                         height: _selectedImage != null ? null : 200,
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).inputDecorationTheme.fillColor,
+                          color:
+                              Theme.of(context).inputDecorationTheme.fillColor,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: Theme.of(
@@ -203,45 +199,46 @@ class _WritePageState extends State<WritePage> {
                             ).dividerColor.withValues(alpha: 0.2),
                           ),
                         ),
-                        child: _selectedImage != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: kIsWeb
-                                    ? Image.network(
-                                        _selectedImage!.path,
-                                        fit: BoxFit.fitWidth,
-                                      )
-                                    : Image.file(
-                                        File(_selectedImage!.path),
-                                        fit: BoxFit.fitWidth,
-                                      ),
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.add_photo_alternate_rounded,
-                                    size: 48,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    "Add a photo",
-                                    style: TextStyle(
-                                      color: Theme.of(context).hintColor,
+                        child:
+                            _selectedImage != null
+                                ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child:
+                                      kIsWeb
+                                          ? Image.network(
+                                            _selectedImage!.path,
+                                            fit: BoxFit.fitWidth,
+                                          )
+                                          : Image.file(
+                                            File(_selectedImage!.path),
+                                            fit: BoxFit.fitWidth,
+                                          ),
+                                )
+                                : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_photo_alternate_rounded,
+                                      size: 48,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      "Add a photo",
+                                      style: TextStyle(
+                                        color: Theme.of(context).hintColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                       ),
                     ),
                     const SizedBox(height: 32),
 
                     // Thought Section
                     Text(
-                      "Comment",
+                      "게시글 내용",
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
                     const SizedBox(height: 8),
@@ -256,7 +253,7 @@ class _WritePageState extends State<WritePage> {
                         minLines: 8,
                         style: Theme.of(context).textTheme.bodyLarge,
                         decoration: const InputDecoration(
-                          hintText: "What's on your mind today?",
+                          hintText: "게시글을 내용을 여기에 작성해 보세요.",
                           alignLabelWithHint: true,
                           filled: false,
                           border: InputBorder.none,
@@ -276,137 +273,138 @@ class _WritePageState extends State<WritePage> {
                 width: double.infinity,
                 height: 56,
                 child: FilledButton.icon(
-                  onPressed: _isUploading
-                      ? null
-                      : () async {
-                          if (_categoryController.text.isEmpty ||
-                              _thoughtController.text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please fill in all fields'),
-                              ),
-                            );
-                            return;
-                          }
-
-                          setState(() {
-                            _isUploading = true;
-                          });
-
-                          try {
-                            String? objectKey;
-                            if (_selectedImage != null) {
-                              final mimeType =
-                                  lookupMimeType(_selectedImage!.path) ??
-                                  'image/jpeg';
-                              final fileName = _selectedImage!.path
-                                  .split('/')
-                                  .last;
-
-                              // 1. Get Presigned URL
-                              final presignedInfo = await _apiService
-                                  .getUploadPresignedUrl(fileName, mimeType);
-                              final presignedUrl =
-                                  presignedInfo['presignedUrl']!;
-                              objectKey = presignedInfo['objectKey'];
-
-                              // 2. Upload to S3
-                              await _apiService.uploadFileToS3(
-                                presignedUrl,
-                                _selectedImage!,
-                                mimeType,
+                  onPressed:
+                      _isUploading
+                          ? null
+                          : () async {
+                            if (_categoryController.text.isEmpty ||
+                                _thoughtController.text.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please fill in all fields'),
+                                ),
                               );
+                              return;
                             }
 
-                            // Call createPost API
-                            if (_selectedCategoryId == null) {
-                              // If user typed manually without selecting from list, try to find ID or handle error
-                              // For now, require selection from list or assume backend handles name lookup (not implemented)
-                              // Simple fallback: search again to find exact match
-                              final results = await _categoryService
-                                  .searchCategories(
-                                    _categoryController.text.substring(1),
-                                  );
-                              if (results.isNotEmpty &&
-                                  results.first['name'] ==
-                                      _categoryController.text.substring(1)) {
-                                _selectedCategoryId = results.first['id'];
-                              } else {
-                                throw Exception(
-                                  'Please select a valid category from the list',
-                                );
-                              }
-                            }
-
-                            // The print statements below are commented out, removing them as per instruction.
-                            // print('Category: ${_categoryController.text}');
-                            // print('Thought: ${_thoughtController.text}');
-                            if (objectKey != null) {
-                              // print('Image Key: $objectKey');
-                            }
-
-                            await _apiService.createPost(
-                              _thoughtController.text,
-                              _selectedCategoryId!,
-                              imageUrl: objectKey,
-                            );
-
-                            if (!context.mounted) return;
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Thought shared successfully!'),
-                              ),
-                            );
-
-                            // Reset fields
-                            _thoughtController.clear();
-                            _categoryController.clear();
                             setState(() {
-                              _selectedImage = null;
-                              _selectedCategoryId = null;
+                              _isUploading = true;
                             });
 
-                            // Trigger history refresh
-                            context
-                                .read<RefreshProvider>()
-                                .triggerRefreshHistory();
+                            try {
+                              String? objectKey;
+                              if (_selectedImage != null) {
+                                final mimeType =
+                                    lookupMimeType(_selectedImage!.path) ??
+                                    'image/jpeg';
+                                final fileName =
+                                    _selectedImage!.path.split('/').last;
 
-                            // Navigate to Home
-                            widget.onPostSuccess?.call();
-                          } catch (e) {
-                            if (!context.mounted) return;
+                                // 1. Get Presigned URL
+                                final presignedInfo = await _apiService
+                                    .getUploadPresignedUrl(fileName, mimeType);
+                                final presignedUrl =
+                                    presignedInfo['presignedUrl']!;
+                                objectKey = presignedInfo['objectKey'];
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e')),
-                            );
-                          } finally {
-                            if (mounted) {
+                                // 2. Upload to S3
+                                await _apiService.uploadFileToS3(
+                                  presignedUrl,
+                                  _selectedImage!,
+                                  mimeType,
+                                );
+                              }
+
+                              // Call createPost API
+                              if (_selectedCategoryId == null) {
+                                // If user typed manually without selecting from list, try to find ID or handle error
+                                // For now, require selection from list or assume backend handles name lookup (not implemented)
+                                // Simple fallback: search again to find exact match
+                                final results = await _categoryService
+                                    .searchCategories(
+                                      _categoryController.text.substring(1),
+                                    );
+                                if (results.isNotEmpty &&
+                                    results.first['name'] ==
+                                        _categoryController.text.substring(1)) {
+                                  _selectedCategoryId = results.first['id'];
+                                } else {
+                                  throw Exception(
+                                    'Please select a valid category from the list',
+                                  );
+                                }
+                              }
+
+                              // The print statements below are commented out, removing them as per instruction.
+                              // print('Category: ${_categoryController.text}');
+                              // print('Thought: ${_thoughtController.text}');
+                              if (objectKey != null) {
+                                // print('Image Key: $objectKey');
+                              }
+
+                              await _apiService.createPost(
+                                _thoughtController.text,
+                                _selectedCategoryId!,
+                                imageUrl: objectKey,
+                              );
+
+                              if (!context.mounted) return;
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Thought shared successfully!'),
+                                ),
+                              );
+
+                              // Reset fields
+                              _thoughtController.clear();
+                              _categoryController.clear();
                               setState(() {
-                                _isUploading = false;
+                                _selectedImage = null;
+                                _selectedCategoryId = null;
                               });
+
+                              // Trigger history refresh
+                              context
+                                  .read<RefreshProvider>()
+                                  .triggerRefreshHistory();
+
+                              // Navigate to Home
+                              widget.onPostSuccess?.call();
+                            } catch (e) {
+                              if (!context.mounted) return;
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            } finally {
+                              if (mounted) {
+                                setState(() {
+                                  _isUploading = false;
+                                });
+                              }
                             }
-                          }
-                        },
+                          },
                   style: FilledButton.styleFrom(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 2,
                   ),
-                  icon: _isUploading
-                      ? Container(
-                          width: 24,
-                          height: 24,
-                          padding: const EdgeInsets.all(2.0),
-                          child: const CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Icon(Icons.send_rounded),
+                  icon:
+                      _isUploading
+                          ? Container(
+                            width: 24,
+                            height: 24,
+                            padding: const EdgeInsets.all(2.0),
+                            child: const CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
+                          )
+                          : const Icon(Icons.send_rounded),
                   label: Text(
-                    _isUploading ? "Sharing..." : "Share Thought",
+                    _isUploading ? "공유중..." : "게시글 공유하기",
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),

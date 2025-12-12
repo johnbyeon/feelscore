@@ -2,9 +2,7 @@ package com.feelscore.back.controller;
 
 import com.feelscore.back.dto.DmMessageResponse;
 import com.feelscore.back.dto.DmSendMessageRequest;
-import com.feelscore.back.dto.DmThreadSummaryResponse;
 import com.feelscore.back.entity.DmMessage;
-import com.feelscore.back.entity.DmThreadMember;
 import com.feelscore.back.security.CustomUserDetails;
 import com.feelscore.back.service.DmService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +22,7 @@ import java.util.List;
 public class DmController {
 
     private final DmService dmService;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
     // 1. 메시지 보내기
     @PostMapping("/message")
@@ -35,28 +34,30 @@ public class DmController {
                 request.getReceiverId(),
                 request.getThreadId(),
                 request.getContent());
-        return ResponseEntity.ok(new DmMessageResponse(message, userDetails.getUserId()));
+
+        DmMessageResponse response = new DmMessageResponse(message, userDetails.getUserId());
+
+        // WebSocket 구독자들에게 브로드캐스트
+        messagingTemplate.convertAndSend(
+                "/sub/chat/room/" + message.getThread().getId(),
+                response);
+
+        return ResponseEntity.ok(response);
     }
 
     // 2. 내 일반 DM함 조회
     @GetMapping("/inbox")
-    public ResponseEntity<List<DmThreadSummaryResponse>> getInbox(
+    public ResponseEntity<List<com.feelscore.back.dto.DmThreadMemberResponseDto>> getInbox(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<DmThreadMember> inbox = dmService.getInbox(userDetails.getUserId());
-        List<DmThreadSummaryResponse> dtos = inbox.stream()
-                .map(DmThreadSummaryResponse::new)
-                .toList();
+        List<com.feelscore.back.dto.DmThreadMemberResponseDto> dtos = dmService.getInbox(userDetails.getUserId());
         return ResponseEntity.ok(dtos);
     }
 
     // 3. 내 메시지 요청함 조회
     @GetMapping("/requests")
-    public ResponseEntity<List<DmThreadSummaryResponse>> getRequestBox(
+    public ResponseEntity<List<com.feelscore.back.dto.DmThreadMemberResponseDto>> getRequestBox(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<DmThreadMember> requests = dmService.getRequestBox(userDetails.getUserId());
-        List<DmThreadSummaryResponse> dtos = requests.stream()
-                .map(DmThreadSummaryResponse::new)
-                .toList();
+        List<com.feelscore.back.dto.DmThreadMemberResponseDto> dtos = dmService.getRequestBox(userDetails.getUserId());
         return ResponseEntity.ok(dtos);
     }
 
@@ -101,7 +102,7 @@ public class DmController {
     public ResponseEntity<Page<DmMessageResponse>> getMessages(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long threadId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
         // TODO: 보안상 이 유저가 이 쓰레드에 속해있는지 체크하는 로직이 Service나 여기서 필요할 수 있음.
         // -> Service에서 체크하도록 변경됨.
@@ -111,5 +112,14 @@ public class DmController {
         Page<DmMessageResponse> dtos = messages.map(msg -> new DmMessageResponse(msg, userDetails.getUserId()));
 
         return ResponseEntity.ok(dtos);
+    }
+
+    // 9. 메시지 읽음 처리
+    @PostMapping("/threads/{threadId}/read")
+    public ResponseEntity<Void> markAsRead(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long threadId) {
+        dmService.markAsRead(userDetails.getUserId(), threadId);
+        return ResponseEntity.ok().build();
     }
 }

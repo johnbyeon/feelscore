@@ -142,7 +142,7 @@ class _PostCardState extends State<PostCard> {
                     return Container(
                       height: 200,
                       width: double.infinity,
-                      color: Colors.grey[200],
+                      color: Colors.grey[900],
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -341,7 +341,7 @@ class _PostCardState extends State<PostCard> {
                           children: [
                             CircleAvatar(
                               radius: 12,
-                              backgroundColor: Colors.grey[300],
+                              backgroundColor: Colors.grey[800],
                               backgroundImage:
                                   authorProfileImage != null
                                       ? NetworkImage(

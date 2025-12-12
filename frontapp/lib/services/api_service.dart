@@ -6,13 +6,117 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 class ApiService {
-  // Android Emulator: 10.0.2.2, iOS Simulator: 127.0.0.1
-  // static const String baseUrl = 'http://127.0.0.1:8080/api';
+  // 1. Android Emulator: 10.0.2.2
+  // 2. iOS Simulator: 127.0.0.1
+  // 1. Android Emulator: 10.0.2.2
+  // 2. iOS Simulator: 127.0.0.1
+  // 3. Real Device: Use your computer's local IP or DDNS
+  static const String? _manualIp =
+      '192.168.0.32'; // Local IP found via ifconfig
 
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:8080/api';
+    if (_manualIp != null) return 'http://$_manualIp:8080/api';
     if (Platform.isAndroid) return 'http://10.0.2.2:8080/api';
     return 'http://127.0.0.1:8080/api';
+  }
+
+  // Helper: Refresh Token
+  Future<String?> refreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final refreshToken = prefs.getString('refreshToken');
+    if (refreshToken == null) return null;
+
+    try {
+      final url = Uri.parse('$baseUrl/auth/refresh');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final newAccessToken = data['access_token'];
+        // Note: Refresh response might not include new refresh token,
+        // so we only update access token unless backend sends it.
+        // Assuming backend only returns access_token based on our implementation.
+        await prefs.setString('accessToken', newAccessToken);
+        return newAccessToken;
+      }
+    } catch (e) {
+      if (kDebugMode) print('Token Refresh Failed: $e');
+    }
+    return null;
+  }
+
+  // Helper: Authenticated Request with Retry
+  Future<http.Response> _authorizedRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? extraHeaders,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('accessToken');
+
+    if (token == null) throw Exception('No access token found');
+
+    // Build URL & Headers
+    // Path can be full URL or relative
+    // If path starts with http, use it as is. Else append to baseUrl.
+    final url =
+        path.startsWith('http') ? Uri.parse(path) : Uri.parse('$baseUrl$path');
+
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+    if (extraHeaders != null) {
+      headers.addAll(extraHeaders);
+    }
+
+    // Function to execute HTTP call
+    Future<http.Response> performRequest(String currentToken) async {
+      headers['Authorization'] = 'Bearer $currentToken';
+      switch (method.toUpperCase()) {
+        case 'POST':
+          return http.post(
+            url,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          );
+        case 'GET':
+          return http.get(url, headers: headers);
+        case 'PUT':
+          return http.put(
+            url,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          );
+        case 'DELETE':
+          return http.delete(url, headers: headers);
+        case 'PATCH':
+          return http.patch(
+            url,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          );
+        default:
+          throw Exception('Unsupported method');
+      }
+    }
+
+    var response = await performRequest(token);
+
+    // If 401, try refresh
+    if (response.statusCode == 401) {
+      final newToken = await refreshToken();
+      if (newToken != null) {
+        response = await performRequest(newToken);
+      }
+    }
+    return response;
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -65,12 +169,9 @@ class ApiService {
       throw Exception('No access token found');
     }
 
-    final url = Uri.parse(
-      '$baseUrl/s3/user/upload-presigned?originalFileName=$originalFileName&contentType=$contentType',
-    );
-    final response = await http.post(
-      url,
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await _authorizedRequest(
+      'POST',
+      '/s3/user/upload-presigned?originalFileName=$originalFileName&contentType=$contentType',
     );
 
     if (response.statusCode == 200) {
@@ -81,6 +182,22 @@ class ApiService {
       };
     } else {
       throw Exception('Failed to get presigned URL: ${response.body}');
+    }
+  }
+
+  Future<String> getDownloadPresignedUrl(
+    String objectKey, {
+    int expirationMinutes = 5,
+  }) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/s3/user/download-presigned?objectKey=$objectKey&expirationMinutes=$expirationMinutes',
+    );
+
+    if (response.statusCode == 200) {
+      return response.body; // Returns URL string
+    } else {
+      throw Exception('Failed to get download presigned URL: ${response.body}');
     }
   }
 
@@ -105,31 +222,68 @@ class ApiService {
     int categoryId, {
     String? imageUrl,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/v1/posts');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
+    final response = await _authorizedRequest(
+      'POST',
+      '/v1/posts',
+      body: {
         'content': content,
         'categoryId': categoryId,
         if (imageUrl != null) 'imageUrl': imageUrl,
-      }),
+      },
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
       throw Exception('Failed to create post: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> updatePost(
+    int postId,
+    String content,
+    int categoryId, {
+    String? imageUrl,
+  }) async {
+    final response = await _authorizedRequest(
+      'PUT',
+      '/v1/posts/$postId',
+      body: {
+        'content': content,
+        'categoryId': categoryId,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to update post: ${response.body}');
+    }
+  }
+
+  Future<void> deletePost(int postId) async {
+    final response = await _authorizedRequest('DELETE', '/v1/posts/$postId');
+
+    if (response.statusCode != 204) {
+      throw Exception('Failed to delete post: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getPostsByEmotion(
+    String emotionType, {
+    int page = 0,
+    int size = 10,
+  }) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/v1/posts/emotion/$emotionType?page=$page&size=$size&sort=createdAt,desc',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get posts by emotion: ${response.body}');
     }
   }
 
@@ -162,22 +316,9 @@ class ApiService {
     int page = 0,
     int size = 10,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse(
-      '$baseUrl/v1/posts/user/$userId?page=$page&size=$size&sort=createdAt,desc',
-    );
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'GET',
+      '/v1/posts/user/$userId?page=$page&size=$size&sort=createdAt,desc',
     );
 
     if (response.statusCode == 200) {
@@ -188,21 +329,10 @@ class ApiService {
   }
 
   Future<void> updateFcmToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    final accessToken = prefs.getString('accessToken');
-
-    if (accessToken == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/user/fcm-token');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-      body: jsonEncode({'token': token}),
+    final response = await _authorizedRequest(
+      'POST',
+      '/user/fcm-token',
+      body: {'token': token},
     );
 
     if (response.statusCode != 200) {
@@ -215,22 +345,9 @@ class ApiService {
     int page = 0,
     int size = 10,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse(
-      '$baseUrl/v1/posts/category/$categoryId?page=$page&size=$size&sort=createdAt,desc',
-    );
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'GET',
+      '/v1/posts/category/$categoryId?page=$page&size=$size&sort=createdAt,desc',
     );
 
     if (response.statusCode == 200) {
@@ -241,20 +358,9 @@ class ApiService {
   }
 
   Future<List<dynamic>> getHomeStats({String period = 'ALL'}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/stats/home?period=$period');
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'GET',
+      '/stats/home?period=$period',
     );
 
     if (response.statusCode == 200) {
@@ -264,22 +370,46 @@ class ApiService {
     }
   }
 
-  Future<void> updateUserProfileImage(String profileImageUrl) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
+  Future<Map<String, dynamic>> getGlobalEmotionCount() async {
+    final response = await _authorizedRequest('GET', '/v1/stats/global/count');
 
-    if (token == null) {
-      throw Exception('No access token found');
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get global emotion count: ${response.body}');
     }
+  }
 
-    final url = Uri.parse('$baseUrl/user/profile-image');
-    final response = await http.patch(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'profileImageUrl': profileImageUrl}),
+  Future<Map<String, dynamic>> getGlobalEmotionScore() async {
+    final response = await _authorizedRequest('GET', '/v1/stats/global/score');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get global emotion score: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getCategoryEmotionRanking(int categoryId) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/v1/stats/categories/$categoryId/ranking',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception(
+        'Failed to get category emotion ranking: ${response.body}',
+      );
+    }
+  }
+
+  Future<void> updateUserProfileImage(String profileImageUrl) async {
+    final response = await _authorizedRequest(
+      'PATCH',
+      '/user/profile-image',
+      body: {'profileImageUrl': profileImageUrl},
     );
 
     if (response.statusCode != 200) {
@@ -287,21 +417,20 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getFollowers(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await _authorizedRequest('GET', '/user/me');
 
-    if (token == null) {
-      throw Exception('No access token found');
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get user info: ${response.body}');
     }
+  }
 
-    final url = Uri.parse('$baseUrl/follows/$userId/followers');
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+  Future<List<dynamic>> getFollowers(String userId) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/follows/$userId/followers',
     );
 
     if (response.statusCode == 200) {
@@ -312,20 +441,9 @@ class ApiService {
   }
 
   Future<List<dynamic>> getFollowings(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/follows/$userId/followings');
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'GET',
+      '/follows/$userId/followings',
     );
 
     if (response.statusCode == 200) {
@@ -336,21 +454,7 @@ class ApiService {
   }
 
   Future<bool> toggleFollow(String targetUserId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/follows/$targetUserId');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final response = await _authorizedRequest('POST', '/follows/$targetUserId');
 
     if (response.statusCode == 200) {
       return response.body == 'true';
@@ -381,16 +485,7 @@ class ApiService {
 
   // Comments
   Future<List<dynamic>> getComments(String postId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    final url = Uri.parse('$baseUrl/posts/$postId/comments');
-    final headers = <String, String>{'Content-Type': 'application/json'};
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-
-    final response = await http.get(url, headers: headers);
+    final response = await _authorizedRequest('GET', '/posts/$postId/comments');
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -403,21 +498,10 @@ class ApiService {
     String postId,
     String content,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/posts/$postId/comments');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'content': content}),
+    final response = await _authorizedRequest(
+      'POST',
+      '/posts/$postId/comments',
+      body: {'content': content},
     );
 
     if (response.statusCode == 200) {
@@ -429,21 +513,10 @@ class ApiService {
 
   // Reactions (Empathy)
   Future<void> toggleReaction(String postId, String emotionType) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/posts/$postId/react');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'emotionType': emotionType}),
+    final response = await _authorizedRequest(
+      'POST',
+      '/posts/$postId/react',
+      body: {'emotionType': emotionType},
     );
 
     if (response.statusCode != 200) {
@@ -475,21 +548,10 @@ class ApiService {
     int commentId,
     String emotionType,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-
-    if (token == null) {
-      throw Exception('No access token found');
-    }
-
-    final url = Uri.parse('$baseUrl/posts/$postId/comments/$commentId/react');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'emotionType': emotionType}),
+    final response = await _authorizedRequest(
+      'POST',
+      '/posts/$postId/comments/$commentId/react',
+      body: {'emotionType': emotionType},
     );
 
     if (response.statusCode != 200) {
@@ -501,19 +563,7 @@ class ApiService {
 
   /// Get DM inbox (list of threads)
   Future<List<dynamic>> getDmInbox() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/dm/inbox');
-
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final response = await _authorizedRequest('GET', '/dm/inbox');
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as List<dynamic>;
@@ -524,19 +574,7 @@ class ApiService {
 
   /// Get DM requests (message requests from non-followers)
   Future<List<dynamic>> getDmRequests() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/dm/requests');
-
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final response = await _authorizedRequest('GET', '/dm/requests');
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as List<dynamic>;
@@ -547,22 +585,13 @@ class ApiService {
 
   /// Get messages in a specific thread
   Future<List<dynamic>> getDmMessages(String threadId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/dm/threads/$threadId/messages');
-
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'GET',
+      '/dm/threads/$threadId/messages',
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
       // Backend returns Page<DmMessageResponse>, so we extract 'content'
       if (data is Map<String, dynamic> && data.containsKey('content')) {
         return data['content'] as List<dynamic>;
@@ -582,27 +611,19 @@ class ApiService {
     String? threadId,
     required String content,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/dm/message');
-
     final body = <String, dynamic>{'content': content};
     if (receiverId != null) body['receiverId'] = int.parse(receiverId);
     if (threadId != null) body['threadId'] = int.parse(threadId);
 
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
+    final response = await _authorizedRequest(
+      'POST',
+      '/dm/message',
+      body: body,
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return jsonDecode(utf8.decode(response.bodyBytes))
+          as Map<String, dynamic>;
     } else {
       throw Exception('Failed to send DM message: ${response.body}');
     }
@@ -610,18 +631,9 @@ class ApiService {
 
   /// Accept a DM request
   Future<void> acceptDmRequest(String threadId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/dm/requests/$threadId/accept');
-
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'POST',
+      '/dm/requests/$threadId/accept',
     );
 
     if (response.statusCode != 200) {
@@ -631,18 +643,9 @@ class ApiService {
 
   /// Delete/reject a DM request
   Future<void> deleteDmRequest(String threadId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/dm/requests/$threadId');
-
-    final response = await http.delete(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'DELETE',
+      '/dm/requests/$threadId',
     );
 
     if (response.statusCode != 200) {
@@ -652,18 +655,9 @@ class ApiService {
 
   /// Hide a DM thread (leave conversation)
   Future<void> hideDmThread(String threadId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/dm/threads/$threadId/hide');
-
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'POST',
+      '/dm/threads/$threadId/hide',
     );
 
     if (response.statusCode != 200) {
@@ -671,24 +665,60 @@ class ApiService {
     }
   }
 
+  /// Leave a DM thread (permanently)
+  Future<void> leaveDmThread(String threadId) async {
+    final response = await _authorizedRequest(
+      'DELETE',
+      '/dm/threads/$threadId/leave',
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to leave DM thread: ${response.body}');
+    }
+  }
+
+  /// Mark thread messages as read
+  Future<void> markAsRead(String threadId) async {
+    final response = await _authorizedRequest(
+      'POST',
+      '/dm/threads/$threadId/read',
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark as read: ${response.body}');
+    }
+  }
+
   // 차단하기
   Future<void> blockUser(String myUserId, String blockedUserId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('No access token found');
-
-    final url = Uri.parse('$baseUrl/blocks/$blockedUserId?userId=$myUserId');
-
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _authorizedRequest(
+      'POST',
+      '/blocks/$blockedUserId?userId=$myUserId',
     );
 
     if (response.statusCode != 200) {
       throw Exception('Failed to block user: ${response.body}');
+    }
+  }
+
+  Future<void> unblockUser(String blockedUserId) async {
+    final response = await _authorizedRequest(
+      'DELETE',
+      '/blocks/$blockedUserId',
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to unblock user: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getBlockList() async {
+    final response = await _authorizedRequest('GET', '/blocks');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get block list: ${response.body}');
     }
   }
 }

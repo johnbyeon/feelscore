@@ -36,10 +36,7 @@ class _FollowListPageState extends State<FollowListPage> {
             indicatorColor: Colors.white,
             labelColor: Colors.white,
             unselectedLabelColor: Colors.grey,
-            tabs: [
-              Tab(text: "Followers"),
-              Tab(text: "Following"),
-            ],
+            tabs: [Tab(text: "Followers"), Tab(text: "Following")],
           ),
         ),
         body: TabBarView(
@@ -103,15 +100,17 @@ class _UserListViewState extends State<_UserListView> {
             return ListTile(
               leading: CircleAvatar(
                 radius: 20,
-                backgroundImage: profileImageUrl != null
-                    ? NetworkImage(
-                        'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/$profileImageUrl',
-                      )
-                    : null,
-                backgroundColor: Colors.grey[300],
-                child: profileImageUrl == null
-                    ? const Icon(Icons.person, color: Colors.white)
-                    : null,
+                backgroundImage:
+                    profileImageUrl != null
+                        ? NetworkImage(
+                          'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/$profileImageUrl',
+                        )
+                        : null,
+                backgroundColor: Colors.grey[800],
+                child:
+                    profileImageUrl == null
+                        ? const Icon(Icons.person, color: Colors.white)
+                        : null,
               ),
               title: Text(
                 nickname,
@@ -123,11 +122,12 @@ class _UserListViewState extends State<_UserListView> {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => UserProfilePage(
-                      userId: userId,
-                      nickname: nickname,
-                      profileImageUrl: profileImageUrl,
-                    ),
+                    builder:
+                        (context) => UserProfilePage(
+                          userId: userId,
+                          nickname: nickname,
+                          profileImageUrl: profileImageUrl,
+                        ),
                   ),
                 );
               },

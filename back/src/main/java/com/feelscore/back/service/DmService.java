@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@lombok.extern.slf4j.Slf4j
 public class DmService {
 
     private final DmThreadRepository dmThreadRepository;
@@ -114,6 +115,13 @@ public class DmService {
 
         // 수신자에게 알림 생성 (수신자가 존재하고, 나 자신에게 보낸게 아닐 때)
         if (receiver != null && !senderId.equals(receiverId)) {
+            log.info("Triggering notification for userId={} (Nickname={})", receiver.getId(), receiver.getNickname());
+
+            if (receiver.getFcmToken() == null) {
+                log.warn("⚠️ Recipient has NO FCM Token! Notification cannot be sent.");
+            } else {
+                log.info("Recipient FCM Token found: {}", receiver.getFcmToken());
+            }
 
             String notiMessage = String.format("%s님이 메시지를 보냈습니다.", sender.getNickname());
 
@@ -123,6 +131,9 @@ public class DmService {
                     com.feelscore.back.entity.NotificationType.DM,
                     notiMessage,
                     thread.getId());
+        } else {
+            log.info("Skipping notification: Receiver is null({}) or Self Message({})", receiver == null,
+                    senderId.equals(receiverId));
         }
 
         return message;
@@ -146,7 +157,7 @@ public class DmService {
 
         // 🔥 메시지를 받는 사람(receiver)
         // 팔로우 여부에 따라 REQUEST / NORMAL 자동 지정
-        DmMemberState receiverState = (receiverFollowsSender || senderFollowsReceiver)
+        DmMemberState receiverState = (receiverFollowsSender && senderFollowsReceiver)
                 ? DmMemberState.NORMAL
                 : DmMemberState.REQUEST;
 
@@ -158,8 +169,15 @@ public class DmService {
         DmThreadMember senderMember = DmThreadMember.create(thread, sender, senderState, senderFolder);
         DmThreadMember receiverMember = DmThreadMember.create(thread, receiver, receiverState, receiverFolder);
 
+        // 연관관계 편의 메서드 사용 (메모리상 동기화)
+        thread.addMember(senderMember);
+        thread.addMember(receiverMember);
+
         dmThreadMemberRepository.save(senderMember);
         dmThreadMemberRepository.save(receiverMember);
+
+        log.info("New DM Thread created. ID={}, SenderState={}, ReceiverState={}",
+                thread.getId(), senderState, receiverState);
 
         return thread;
     }
@@ -173,8 +191,8 @@ public class DmService {
         boolean receiverFollowsSender = followRepository.existsByFollowerAndFollowing(receiver, sender);
         boolean senderFollowsReceiver = followRepository.existsByFollowerAndFollowing(sender, receiver);
 
-        // 둘 중 하나라도 팔로우 관계가 있다면 인박스로 승격 가능
-        if (receiverFollowsSender || senderFollowsReceiver) {
+        // 둘 다 팔로우 관계가 성립해야(맞팔) 인박스로 승격
+        if (receiverFollowsSender && senderFollowsReceiver) {
             DmThreadMember receiverMember = dmThreadMemberRepository
                     .findByThreadIdAndUserId(thread.getId(), receiver.getId())
                     .orElseThrow(() -> new EntityNotFoundException("DM 멤버 정보를 찾을 수 없습니다."));
@@ -186,23 +204,67 @@ public class DmService {
     }
 
     /**
-     * 내 일반 DM함 조회 (숨김 제외)
+     * 내 일반 DM함 조회 (숨김 제외) - Unread Count 포함
      */
     @Transactional(readOnly = true)
-    public List<DmThreadMember> getInbox(Long userId) {
+    public List<com.feelscore.back.dto.DmThreadMemberResponseDto> getInbox(Long userId) {
+        log.info("getInbox userId={}", userId);
         List<DmThreadMember> members = dmThreadMemberRepository.findByUserIdAndFolderAndHiddenFalse(userId,
                 DmFolder.PRIMARY);
-        return filterBlockedMembers(userId, members);
+        log.info("Found {} members in Inbox (Primary)", members.size());
+
+        List<DmThreadMember> filteredMembers = filterBlockedMembers(userId, members);
+
+        return filteredMembers.stream().map(member -> {
+            // 상대방 찾기
+            DmThreadMember otherMember = member.getThread().getMembers().stream()
+                    .filter(m -> !m.getUser().getId().equals(userId))
+                    .findFirst()
+                    .orElse(member); // 나 자신과의 대화인 경우 (예외처리)
+
+            // 안 읽은 메시지 수 계산
+            long unreadCount = 0;
+            if (member.getLastReadMessage() != null) {
+                unreadCount = dmMessageRepository.countByThreadIdAndIdGreaterThan(
+                        member.getThread().getId(), member.getLastReadMessage().getId());
+            } else {
+                unreadCount = dmMessageRepository.countByThreadId(member.getThread().getId());
+            }
+
+            return new com.feelscore.back.dto.DmThreadMemberResponseDto(member, otherMember, unreadCount);
+        }).collect(Collectors.toList());
     }
 
     /**
-     * 내 메시지 요청함 조회
+     * 내 메시지 요청함 조회 - Unread Count 포함
      */
     @Transactional(readOnly = true)
-    public List<DmThreadMember> getRequestBox(Long userId) {
+    public List<com.feelscore.back.dto.DmThreadMemberResponseDto> getRequestBox(Long userId) {
+        log.info("getRequestBox userId={}", userId);
         List<DmThreadMember> members = dmThreadMemberRepository.findByUserIdAndStateAndHiddenFalse(userId,
                 DmMemberState.REQUEST);
-        return filterBlockedMembers(userId, members);
+        log.info("Found {} members in RequestBox (Request)", members.size());
+
+        List<DmThreadMember> filteredMembers = filterBlockedMembers(userId, members);
+
+        return filteredMembers.stream().map(member -> {
+            // 상대방 찾기
+            DmThreadMember otherMember = member.getThread().getMembers().stream()
+                    .filter(m -> !m.getUser().getId().equals(userId))
+                    .findFirst()
+                    .orElse(member);
+
+            // 안 읽은 메시지 수 계산 (요청함도 미리보기로 확인 가능하므로 계산)
+            long unreadCount = 0;
+            if (member.getLastReadMessage() != null) {
+                unreadCount = dmMessageRepository.countByThreadIdAndIdGreaterThan(
+                        member.getThread().getId(), member.getLastReadMessage().getId());
+            } else {
+                unreadCount = dmMessageRepository.countByThreadId(member.getThread().getId());
+            }
+
+            return new com.feelscore.back.dto.DmThreadMemberResponseDto(member, otherMember, unreadCount);
+        }).collect(Collectors.toList());
     }
 
     private List<DmThreadMember> filterBlockedMembers(Long userId, List<DmThreadMember> members) {
@@ -303,12 +365,29 @@ public class DmService {
     public Page<DmMessage> loadMessages(Long threadId, Pageable pageable, Long userId) {
         // 권한 체크: 사용자가 해당 쓰레드의 멤버인지 확인
         boolean isMember = dmThreadMemberRepository.existsByThreadIdAndUserId(threadId, userId);
+        log.info("Access Check: threadId={}, userId={}, isMember={}", threadId, userId, isMember);
+
         if (!isMember) {
+            log.error("Access Denied for userId={} on threadId={}", userId, threadId);
             throw new IllegalArgumentException("해당 대화방에 접근 권한이 없습니다.");
         }
 
         // TODO: 향후 퍼포먼스 이슈 시 NoOffset 방식(lastMessageId 기반) 고려 가능
-        return dmMessageRepository.findByThreadIdOrderByCreatedAtAsc(threadId, pageable);
+        return dmMessageRepository.findByThreadId(threadId, pageable);
+    }
+
+    /**
+     * 마지막 메시지 읽음 처리
+     */
+    public void markAsRead(Long userId, Long threadId) {
+        DmThreadMember me = dmThreadMemberRepository
+                .findByThreadIdAndUserId(threadId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("DM 멤버 정보를 찾을 수 없습니다."));
+
+        DmThread thread = me.getThread();
+        if (thread.getLastMessage() != null) {
+            me.updateLastRead(thread.getLastMessage());
+        }
     }
 
     // ======================

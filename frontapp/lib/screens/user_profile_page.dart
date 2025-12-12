@@ -159,13 +159,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
         isMe ? userProvider.profileImageUrl : widget.profileImageUrl;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      // backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Text(
           widget.nickname,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: DefaultTabController(
@@ -198,7 +198,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                             'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/$displayProfileImage',
                                           )
                                           : null,
-                                  backgroundColor: Colors.grey[300],
+                                  backgroundColor: Colors.grey[800],
                                   child:
                                       displayProfileImage == null
                                           ? const Icon(

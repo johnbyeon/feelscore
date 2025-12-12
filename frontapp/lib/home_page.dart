@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'package:provider/provider.dart';
 import 'providers/refresh_provider.dart';
+import 'providers/user_provider.dart';
 import 'category_detail_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -87,6 +88,18 @@ class _HomePageState extends State<HomePage> {
         _isLoading = false;
       });
     } catch (e) {
+      if (e.toString().toLowerCase().contains('unauthorized')) {
+        // Token expired or invalid -> Logout and Redirect
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<UserProvider>().logout();
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/login', (route) => false);
+          });
+        }
+        return;
+      }
       setState(() {
         _errorMessage = 'Failed to load stats: $e';
         _isLoading = false;

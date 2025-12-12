@@ -14,11 +14,24 @@ import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Ensure Firebase is initialized
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    print('Error initializing Firebase in background handler: $e');
+  }
+
   print("Handling a background message: ${message.messageId}");
+  print("Background Msg Title: ${message.notification?.title}");
+  print("Background Msg Body: ${message.notification?.body}");
+  print("Background Msg Data: ${message.data}");
 }
+
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,11 +42,19 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // Initialize FCM Service
-    await FCMService().initialize();
+    // We will set the key here or import it in FCMService?
+    // Let's pass it via setter to avoid circular deps if FCMService is used elsewhere without main.
+    // Or just import main.dart in FCMService is fine for the key.
+    // But better: FCMService().setScaffoldMessengerKey(rootScaffoldMessengerKey);
+    // await FCMService().initialize(); - we'll update this logic
   } catch (e) {
     print("Failed to initialize Firebase: $e");
     // Continue app execution even if Firebase fails
   }
+
+  // Pre-set the key so initialize can use it if needed, or use it later
+  FCMService().setNavigatorKey(navigatorKey);
+  await FCMService().initialize();
 
   runApp(
     MultiProvider(
@@ -52,6 +73,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       title: 'FeelScore',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -60,9 +83,9 @@ class MyApp extends StatelessWidget {
           surface: const Color(0xFF1E1E1E),
         ),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        scaffoldBackgroundColor: const Color(0xFF070707),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF121212),
+          backgroundColor: Color(0xFF070707),
           foregroundColor: Colors.white,
         ),
         inputDecorationTheme: InputDecorationTheme(
@@ -105,9 +128,16 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        navigationRailTheme: const NavigationRailThemeData(
+          backgroundColor: Color(0xFF070707),
+          selectedIconTheme: IconThemeData(color: Color(0xFFD0BCFF)),
+          unselectedIconTheme: IconThemeData(color: Color(0xFFE6E1E5)),
+          selectedLabelTextStyle: TextStyle(color: Color(0xFFE6E1E5)),
+          unselectedLabelTextStyle: TextStyle(color: Color(0xFFE6E1E5)),
+        ),
         navigationBarTheme: NavigationBarThemeData(
           overlayColor: WidgetStateProperty.all(Colors.transparent),
-          backgroundColor: const Color(0xFF1E1E1E),
+          backgroundColor: const Color(0xFF070707),
           indicatorColor: const Color(0xFF4F378B),
           iconTheme: WidgetStateProperty.all(
             const IconThemeData(color: Color(0xFFE6E1E5)),

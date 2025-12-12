@@ -176,12 +176,10 @@ public class CategoryStatsService {
             // 총점 계산 (모든 감정 포함? 아니면 특정 감정만? 보통 다 포함)
             totalScore += entry.getValue();
 
-            // Dominant 계산 (NEUTRAL 제외)
-            if (entry.getKey() != EmotionType.NEUTRAL) {
-                if (entry.getValue() > maxScore) {
-                    maxScore = entry.getValue();
-                    dominant = entry.getKey();
-                }
+            // Dominant 계산 (NEUTRAL 포함)
+            if (entry.getValue() > maxScore) {
+                maxScore = entry.getValue();
+                dominant = entry.getKey();
             }
         }
 

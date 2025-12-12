@@ -14,16 +14,16 @@ import time
 load_dotenv()
 
 # Configuration
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "3306")
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
-DB_NAME = os.getenv("DB_NAME", "feelscore")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
 
-RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
-RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", 5672))
-RABBITMQ_USER = os.getenv("RABBITMQ_USER", "guest")
-RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "guest")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
+RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT"))
+RABBITMQ_USER = os.getenv("RABBITMQ_USER")
+RABBITMQ_PASS = os.getenv("RABBITMQ_PASS")
 
 # AI Model Configuration (Ollama)
 OLLAMA_MODEL = "exaone3.5:7.8b"

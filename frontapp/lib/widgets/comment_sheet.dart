@@ -78,7 +78,7 @@ class _CommentSheetState extends State<CommentSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: Colors.grey[700],
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -124,7 +124,7 @@ class _CommentSheetState extends State<CommentSheet> {
                             children: [
                               CircleAvatar(
                                 radius: 16,
-                                backgroundColor: Colors.grey[300],
+                                backgroundColor: Colors.grey[800],
                                 backgroundImage:
                                     userProfile != null
                                         ? NetworkImage(
@@ -207,7 +207,7 @@ class _CommentSheetState extends State<CommentSheet> {
                                                             vertical: 2,
                                                           ),
                                                       decoration: BoxDecoration(
-                                                        color: Colors.grey[200],
+                                                        color: Colors.grey[800],
                                                         borderRadius:
                                                             BorderRadius.circular(
                                                               4,
@@ -217,7 +217,7 @@ class _CommentSheetState extends State<CommentSheet> {
                                                         "${_getEmotionText(entry.key)} ${entry.value}",
                                                         style: TextStyle(
                                                           fontSize: 10,
-                                                          color: Colors.black87,
+                                                          color: Colors.white,
                                                         ),
                                                       ),
                                                     ),
@@ -242,7 +242,7 @@ class _CommentSheetState extends State<CommentSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.grey[200]!)),
+              border: Border(top: BorderSide(color: Colors.grey[800]!)),
             ),
             child: SafeArea(
               child: Row(
@@ -251,7 +251,7 @@ class _CommentSheetState extends State<CommentSheet> {
                     child: TextField(
                       controller: _commentController,
                       style: const TextStyle(
-                        color: Colors.black87,
+                        color: Colors.white,
                       ), // Updated text color
                       decoration: InputDecoration(
                         hintText: '댓글 달기...',
@@ -261,7 +261,8 @@ class _CommentSheetState extends State<CommentSheet> {
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor:
+                            Theme.of(context).inputDecorationTheme.fillColor,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 10,

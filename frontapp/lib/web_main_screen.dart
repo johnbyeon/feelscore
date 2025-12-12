@@ -6,6 +6,7 @@ import 'screens/user_profile_page.dart';
 import 'write_page.dart';
 import 'history_page.dart';
 import 'home_page.dart';
+import 'screens/dm_inbox_page.dart';
 
 class WebMainScreen extends StatefulWidget {
   const WebMainScreen({super.key});
@@ -21,6 +22,7 @@ class _WebMainScreenState extends State<WebMainScreen> {
     const HomePage(),
     WritePage(onPostSuccess: () => _onItemTapped(0)),
     const HistoryPage(),
+    const DmInboxPage(),
     Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         return UserProfilePage(
@@ -35,7 +37,7 @@ class _WebMainScreenState extends State<WebMainScreen> {
   void _onItemTapped(int index) {
     if (index == 2) {
       context.read<RefreshProvider>().triggerRefreshHistory();
-    } else if (index == 3) {
+    } else if (index == 4) {
       context.read<RefreshProvider>().triggerRefreshProfile();
     }
     setState(() {
@@ -67,6 +69,11 @@ class _WebMainScreenState extends State<WebMainScreen> {
                 icon: Icon(Icons.history_rounded),
                 selectedIcon: Icon(Icons.history_edu_rounded),
                 label: Text('History'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.mail_outline),
+                selectedIcon: Icon(Icons.mail_rounded),
+                label: Text('Messages'),
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.person_outline),

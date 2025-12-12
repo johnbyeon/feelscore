@@ -24,4 +24,20 @@ public interface DmMessageRepository extends JpaRepository<DmMessage, Long> {
     void deleteBySender(com.feelscore.back.entity.Users sender);
 
     List<DmMessage> findBySender(com.feelscore.back.entity.Users sender);
+
+    /**
+     * 한 대화방의 메시지 페이징 조회 (정렬 조건은 Pageable에서 정의)
+     */
+    Page<DmMessage> findByThreadId(Long threadId, Pageable pageable);
+
+    /**
+     * 안 읽은 메시지 개수 계산
+     * - lastReadMessageId 이후의 메시지 개수
+     */
+    long countByThreadIdAndIdGreaterThan(Long threadId, Long lastReadMessageId);
+
+    /**
+     * 안 읽은 메시지 개수 계산 (읽은 메시지가 없을 때 - 전체 개수)
+     */
+    long countByThreadId(Long threadId);
 }

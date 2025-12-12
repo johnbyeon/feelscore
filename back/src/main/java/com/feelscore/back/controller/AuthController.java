@@ -2,6 +2,7 @@ package com.feelscore.back.controller;
 
 import com.feelscore.back.dto.JoinRequest;
 import com.feelscore.back.dto.LoginRequest;
+import com.feelscore.back.dto.TokenRefreshRequest;
 import com.feelscore.back.myjwt.JwtTokenService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -88,5 +89,28 @@ public class AuthController {
                 return ResponseEntity.ok()
                                 .header("Authorization", "Bearer " + accessToken)
                                 .body(payload);
+        }
+
+        @PostMapping("/refresh")
+        public ResponseEntity<?> refresh(@RequestBody TokenRefreshRequest req) {
+                String refreshToken = req.getRefreshToken();
+
+                if (refreshToken == null || jwtTokenService.isExpired(refreshToken)) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                        .body(Map.of("message", "Invalid or Expired Refresh Token"));
+                }
+
+                String email = jwtTokenService.extractEmail(refreshToken);
+                // Role 정보도 필요하다면 DB에서 조회하거나, Refresh Token에 포함시킬 수 있음.
+                // 여기서는 DB 조회로 정확한 Role을 가져오는 것이 안전함.
+                String role = userRepository.findByEmail(email)
+                                .map(user -> user.getRole().name()) // Enum -> String
+                                .orElse("USER");
+
+                String newAccessToken = jwtTokenService.createAccessToken(email, role);
+
+                return ResponseEntity.ok(Map.of(
+                                "access_token", newAccessToken,
+                                "token_type", "Bearer"));
         }
 }
