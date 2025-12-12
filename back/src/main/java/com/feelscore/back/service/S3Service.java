@@ -100,4 +100,12 @@ public class S3Service {
         // Presigned URL 생성 및 반환
         return amazonS3.generatePresignedUrl(generatePresignedUrlRequest).toString();
     }
+
+    /**
+     * @brief S3 버킷에서 특정 객체(파일)를 삭제합니다.
+     * @param objectKey 삭제할 S3 객체 키
+     */
+    public void deleteFile(String objectKey) {
+        amazonS3.deleteObject(bucket, objectKey);
+    }
 }

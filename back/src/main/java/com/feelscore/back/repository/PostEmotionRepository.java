@@ -100,4 +100,6 @@ public interface PostEmotionRepository extends JpaRepository<PostEmotion, Long> 
                         +
                         "GROUP BY p.users.id")
         Optional<com.feelscore.back.dto.EmotionSumDto> sumScoresByUserId(@Param("userId") Long userId);
+
+        void deleteByPost(com.feelscore.back.entity.Post post);
 }

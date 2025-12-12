@@ -14,15 +14,18 @@ public interface DmThreadRepository extends JpaRepository<DmThread, Long> {
      * (항상 멤버가 2명인 구조를 전제로 함)
      */
     @Query("""
-        select t
-        from DmThread t
-            join t.members m1
-            join t.members m2
-        where m1.user.id = :userId1
-          and m2.user.id = :userId2
-        """)
+            select t
+            from DmThread t
+                join t.members m1
+                join t.members m2
+            where m1.user.id = :userId1
+              and m2.user.id = :userId2
+            """)
     Optional<DmThread> findDirectThreadBetween(
             @Param("userId1") Long userId1,
-            @Param("userId2") Long userId2
-    );
+            @Param("userId2") Long userId2);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE DmThread t SET t.lastMessage = null WHERE t.lastMessage.sender = :sender")
+    void setLastMessageNullBySender(@Param("sender") com.feelscore.back.entity.Users sender);
 }

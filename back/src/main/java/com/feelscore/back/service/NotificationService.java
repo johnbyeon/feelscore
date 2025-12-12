@@ -18,6 +18,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationProducer notificationProducer;
+    private final com.feelscore.back.repository.UserRepository userRepository;
 
     /**
      * 내 알림 목록 조회
@@ -64,5 +65,12 @@ public class NotificationService {
             default:
                 return "새로운 알림";
         }
+    }
+
+    @Transactional
+    public void deleteAllNotificationsByUser(Long userId) {
+        Users user = userRepository.findById(userId).orElseThrow();
+        notificationRepository.deleteByRecipient(user);
+        notificationRepository.deleteBySender(user);
     }
 }

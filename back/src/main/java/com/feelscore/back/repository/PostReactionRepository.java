@@ -20,4 +20,8 @@ public interface PostReactionRepository extends JpaRepository<PostReaction, Long
     // Efficiently count all reactions for a post grouped by emotion type
     @Query("SELECT r.emotionType, COUNT(r) FROM PostReaction r WHERE r.post = :post GROUP BY r.emotionType")
     List<Object[]> countReactionsByPost(@Param("post") Post post);
+
+    void deleteByUsers(Users users);
+
+    void deleteAllByPost(Post post);
 }

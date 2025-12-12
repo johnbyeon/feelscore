@@ -15,5 +15,10 @@ public interface BlockRepository extends JpaRepository<Block, Long> {
     void deleteByBlockerAndBlocked(Users blocker, Users blocked);
 
     // 내가 차단한 목록 조회
+    // 내가 차단한 목록 조회
     List<Block> findByBlocker(Users blocker);
+
+    void deleteByBlocker(Users blocker);
+
+    void deleteByBlocked(Users blocked);
 }
