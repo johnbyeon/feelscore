@@ -1,6 +1,7 @@
 package com.feelscore.back.dto;
 
 import com.feelscore.back.entity.Users;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,13 +22,20 @@ public class UsersDto {
         private Long id;
         private String nickname; // PostDto.ListResponse에서 post.getUsers().getNickname()을 사용하므로 닉네임 필드 필수
         private String profileImageUrl;
+        @JsonProperty("isOnline")
+        private boolean isOnline; // 실시간 접속 여부
 
         public static SimpleResponse from(Users users) {
+            return from(users, false);
+        }
+
+        public static SimpleResponse from(Users users, boolean isOnline) {
             // Null 체크는 서비스에서 보장되어야 하나, 안전을 위해 Users 엔티티가 존재한다고 가정
             return SimpleResponse.builder()
                     .id(users.getId())
                     .nickname(users.getNickname())
                     .profileImageUrl(users.getProfileImageUrl())
+                    .isOnline(isOnline)
                     .build();
         }
     }

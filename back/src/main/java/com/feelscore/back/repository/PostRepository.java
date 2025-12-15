@@ -78,4 +78,22 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                         Pageable pageable);
 
         List<Post> findAllByUsers_Id(Long userId);
+
+        // [NEW] 키워드로 게시글 검색 (OR 조건, content에 포함된 게시글)
+        @Query("SELECT p, pe.dominantEmotion FROM Post p LEFT JOIN PostEmotion pe ON p.id = pe.post.id " +
+                        "WHERE p.status = :status AND p.content LIKE CONCAT('%', :keyword, '%') " +
+                        "ORDER BY p.createdAt DESC")
+        Page<Object[]> searchByKeyword(@Param("keyword") String keyword,
+                        @Param("status") PostStatus status,
+                        Pageable pageable);
+
+        // [NEW] 카테고리별 게시글 조회 - 총 리액션 수 기준 정렬 (내림차순), 동점시 content 가나다순
+        @Query("SELECT p, pe.dominantEmotion, " +
+                        "(SELECT COUNT(pr) FROM PostReaction pr WHERE pr.post = p) as reactionCount " +
+                        "FROM Post p LEFT JOIN PostEmotion pe ON p.id = pe.post.id " +
+                        "WHERE p.category.id IN :categoryIds AND p.status = :status " +
+                        "ORDER BY reactionCount DESC, p.content ASC")
+        Page<Object[]> findByCategoryOrderByReactionCount(@Param("categoryIds") List<Long> categoryIds,
+                        @Param("status") PostStatus status,
+                        Pageable pageable);
 }

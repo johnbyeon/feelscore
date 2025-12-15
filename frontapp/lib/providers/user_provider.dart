@@ -11,14 +11,23 @@ class UserProvider with ChangeNotifier {
   String? _nickname;
   String? _profileImageUrl;
   String? _accessToken;
-  String? _refreshToken; // Add refreshToken field
+  String? _refreshToken;
+  String? _email; // 이메일 필드 추가
+  String? _todayEmotion;
 
   bool get isLoggedIn => _isLoggedIn;
   String? get userId => _userId;
   String? get nickname => _nickname;
   String? get profileImageUrl => _profileImageUrl;
   String? get accessToken => _accessToken;
-  String? get refreshToken => _refreshToken; // Getter
+  String? get refreshToken => _refreshToken;
+  String? get email => _email; // 이메일 게터 추가
+  String? get todayEmotion => _todayEmotion;
+
+  void setTodayEmotion(String emotion) {
+    _todayEmotion = emotion;
+    notifyListeners();
+  }
 
   Future<void> checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,7 +35,8 @@ class UserProvider with ChangeNotifier {
     final nickname = prefs.getString('nickname');
     final profileImageUrl = prefs.getString('profileImageUrl');
     final accessToken = prefs.getString('accessToken');
-    final refreshToken = prefs.getString('refreshToken'); // Load refreshToken
+    final refreshToken = prefs.getString('refreshToken');
+    final email = prefs.getString('email'); // 이메일 로드
 
     if (userId != null && accessToken != null) {
       _isLoggedIn = true;
@@ -37,6 +47,7 @@ class UserProvider with ChangeNotifier {
       _profileImageUrl = profileImageUrl;
       _accessToken = accessToken;
       _refreshToken = refreshToken;
+      _email = email; // 이메일 설정
       notifyListeners();
     }
   }
@@ -48,8 +59,18 @@ class UserProvider with ChangeNotifier {
       _nickname = data['nickname'];
       _profileImageUrl = data['profileImageUrl'];
       _accessToken = data['access_token'];
-      _refreshToken = data['refresh_token']; // Get refresh token from response
+      _refreshToken = data['refresh_token'];
       _isLoggedIn = true;
+
+      // 로그인 직후 사용자 상세 정보(이메일 포함) 가져오기
+      try {
+        await fetchMe();
+      } catch (e) {
+        if (kDebugMode) {
+          print('Login fetchMe error: $e');
+        }
+        // fetchMe 실패해도 로그인은 성공 처리
+      }
 
       // Update FCMService with current user ID
       FCMService().setCurrentUserId(_userId);
@@ -128,6 +149,13 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateNickname(String newNickname) async {
+    _nickname = newNickname;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('nickname', newNickname);
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     _isLoggedIn = false;
     _userId = null;
@@ -135,6 +163,7 @@ class UserProvider with ChangeNotifier {
     _profileImageUrl = null;
     _accessToken = null;
     _refreshToken = null;
+    _email = null;
 
     // Clear FCMService user ID
     FCMService().setCurrentUserId(null);
@@ -143,5 +172,31 @@ class UserProvider with ChangeNotifier {
     await prefs.clear();
 
     notifyListeners();
+  }
+
+  Future<void> fetchMe() async {
+    try {
+      final data = await _apiService.getMe();
+      if (data['email'] != null) {
+        _email = data['email'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('email', _email!);
+      }
+      if (data['nickname'] != null) {
+        _nickname = data['nickname'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('nickname', _nickname!);
+      }
+      if (data['profileImageUrl'] != null) {
+        _profileImageUrl = data['profileImageUrl'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profileImageUrl', _profileImageUrl!);
+      }
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('FetchMe Failed: $e');
+      }
+    }
   }
 }

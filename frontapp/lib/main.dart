@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/refresh_provider.dart';
+import 'providers/follow_provider.dart';
 import 'screens/login_screen.dart';
 import 'main_screen.dart';
 import 'widgets/responsive_layout.dart';
@@ -61,6 +62,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => RefreshProvider()),
+        ChangeNotifierProvider(create: (_) => FollowProvider()),
       ],
       child: const MyApp(),
     ),

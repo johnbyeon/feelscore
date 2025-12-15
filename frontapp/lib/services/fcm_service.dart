@@ -238,8 +238,9 @@ class FCMService {
     _showLocalNotification(title, body);
 
     if (_navigatorKey?.currentState == null) {
-      if (kDebugMode)
+      if (kDebugMode) {
         print('FCMService: Navigator State is NULL. Aborting overlay.');
+      }
       return;
     }
 

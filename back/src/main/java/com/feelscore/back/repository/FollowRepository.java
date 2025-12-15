@@ -25,4 +25,10 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
     void deleteByFollower(Users follower);
 
     void deleteByFollowing(Users following);
+
+    // Search Followers by nickname (Case Insensitive)
+    List<Follow> findByFollowingAndFollower_NicknameContainingIgnoreCase(Users following, String nickname);
+
+    // Search Followings by nickname (Case Insensitive)
+    List<Follow> findByFollowerAndFollowing_NicknameContainingIgnoreCase(Users follower, String nickname);
 }

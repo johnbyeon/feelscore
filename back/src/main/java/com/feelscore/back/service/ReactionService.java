@@ -86,7 +86,10 @@ public class ReactionService {
                         .type(com.feelscore.back.entity.NotificationType.POST_REACTION)
                         .relatedId(postId)
                         .title("새로운 반응이 있습니다!")
-                        .body(user.getNickname() + "님이 회원님의 게시글에 공감했습니다: " + emotionType)
+                        .body(user.getNickname() + "님이 회원님의 게시글에 공감했습니다") // Body text simplified as icon will show
+                                                                          // emotion
+                        .reactionType(emotionType.toString())
+                        .relatedContentImageUrl(post.getImageUrl())
                         .build();
 
                 notificationProducer.sendNotification(eventDto);

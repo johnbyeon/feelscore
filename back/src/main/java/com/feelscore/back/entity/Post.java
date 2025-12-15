@@ -62,4 +62,8 @@ public class Post extends BaseTimeEntity {
     public void setStatus(PostStatus status) {
         this.status = status;
     }
+
+    public void updateImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
 }

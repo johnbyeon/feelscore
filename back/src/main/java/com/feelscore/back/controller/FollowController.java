@@ -49,14 +49,18 @@ public class FollowController {
     }
 
     @GetMapping("/{targetId}/followers")
-    public ResponseEntity<List<UsersDto.SimpleResponse>> getFollowers(@PathVariable Long targetId) {
-        List<UsersDto.SimpleResponse> followers = followService.getFollowers(targetId);
+    public ResponseEntity<List<UsersDto.SimpleResponse>> getFollowers(
+            @PathVariable Long targetId,
+            @RequestParam(required = false) String query) {
+        List<UsersDto.SimpleResponse> followers = followService.getFollowers(targetId, query);
         return ResponseEntity.ok(followers);
     }
 
     @GetMapping("/{targetId}/followings")
-    public ResponseEntity<List<UsersDto.SimpleResponse>> getFollowings(@PathVariable Long targetId) {
-        List<UsersDto.SimpleResponse> followings = followService.getFollowings(targetId);
+    public ResponseEntity<List<UsersDto.SimpleResponse>> getFollowings(
+            @PathVariable Long targetId,
+            @RequestParam(required = false) String query) {
+        List<UsersDto.SimpleResponse> followings = followService.getFollowings(targetId, query);
         return ResponseEntity.ok(followings);
     }
 }

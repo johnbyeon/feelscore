@@ -29,23 +29,35 @@ public class CommentService {
         private final PostRepository postRepository;
         private final UserRepository userRepository;
         private final NotificationProducer notificationProducer; // 🔹 알림 발송자 주입
+        private final MentionService mentionService; // @멘션 서비스
 
         @Transactional
-        public CommentDto.Response createComment(Long postId, Long userId, String content) {
+        public CommentDto.Response createComment(Long postId, Long userId, String content, Long parentId) {
                 Post post = postRepository.findById(postId)
                                 .orElseThrow(() -> new NoSuchElementException("Post not found id: " + postId));
                 Users user = userRepository.findById(userId)
                                 .orElseThrow(() -> new NoSuchElementException("User not found id: " + userId));
 
+                Comment parent = null;
+                if (parentId != null) {
+                        parent = commentRepository.findById(parentId)
+                                        .orElseThrow(() -> new NoSuchElementException(
+                                                        "Parent comment not found id: " + parentId));
+                }
+
                 Comment comment = Comment.builder()
                                 .post(post)
                                 .users(user)
                                 .content(content)
+                                .parent(parent)
                                 .build();
 
                 commentRepository.save(comment);
 
-                // 🔹 알림 발송 로직 (내 글에 내가 쓴 댓글은 알림 X)
+                // 🔹 알림 발송 (내 글에 내가 쓴 댓글은 알림 X)
+                // 답글인 경우 원댓글 작성자에게 알림? (Optional enhancement, sticking to post writer for now
+                // or adding condition)
+                // For MVP, keep post writer notification.
                 try {
                         Users postWriter = post.getUsers();
                         if (postWriter != null && !postWriter.getId().equals(userId)) {
@@ -57,14 +69,43 @@ public class CommentService {
                                                 .relatedId(postId)
                                                 .title("새로운 댓글이 달렸습니다!")
                                                 .body(user.getNickname() + "님이 댓글을 남겼습니다: " + content)
+                                                .relatedContentImageUrl(post.getImageUrl())
                                                 .build();
 
                                 notificationProducer.sendNotification(eventDto);
                         }
+                        // 답글 알림 추가 (원댓글 작성자에게)
+                        if (parent != null && !parent.getUsers().getId().equals(userId)) {
+                                // Only notify if parent author is different from replier AND different from
+                                // post writer (avoid duplicate if post writer == parent writer)
+                                // Actually, simple check:
+                                if (postWriter != null && !parent.getUsers().getId().equals(postWriter.getId())) {
+                                        com.feelscore.back.dto.NotificationEventDto replyEvent = com.feelscore.back.dto.NotificationEventDto
+                                                        .builder()
+                                                        .recipientId(parent.getUsers().getId())
+                                                        .senderId(userId)
+                                                        .type(com.feelscore.back.entity.NotificationType.COMMENT) // Or
+                                                                                                                  // new
+                                                                                                                  // type
+                                                                                                                  // REPLY?
+                                                                                                                  // reuse
+                                                                                                                  // COMMENT
+                                                        .relatedId(postId)
+                                                        .title("새로운 답글이 달렸습니다!")
+                                                        .body(user.getNickname() + "님이 답글을 남겼습니다: " + content)
+                                                        .relatedContentImageUrl(post.getImageUrl())
+                                                        .build();
+                                        notificationProducer.sendNotification(replyEvent);
+                                }
+                        }
+
                 } catch (Exception e) {
                         System.err.println("Failed to send comment notification: " + e.getMessage());
                         e.printStackTrace();
                 }
+
+                // @멘션 처리
+                mentionService.processMentionsForComment(comment, user, content);
 
                 return CommentDto.Response.from(comment);
         }
@@ -75,7 +116,7 @@ public class CommentService {
 
                 List<Comment> comments = commentRepository.findByPostOrderByCreatedAtAsc(post);
 
-                return comments.stream().map(comment -> {
+                List<CommentDto.Response> allDtos = comments.stream().map(comment -> {
                         List<Object[]> reactionObjs = commentReactionRepository.countReactionsByComment(comment);
                         Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new HashMap<>();
                         for (Object[] row : reactionObjs) {
@@ -94,6 +135,33 @@ public class CommentService {
 
                         return CommentDto.Response.from(comment, reactionCounts, myReaction);
                 }).collect(Collectors.toList());
+
+                // Build Hierarchy
+                List<CommentDto.Response> roots = new java.util.ArrayList<>();
+                Map<Long, CommentDto.Response> map = allDtos.stream()
+                                .collect(Collectors.toMap(CommentDto.Response::getId, c -> c));
+
+                for (CommentDto.Response dto : allDtos) {
+                        if (dto.getParentId() != null) {
+                                CommentDto.Response p = map.get(dto.getParentId());
+                                if (p != null) {
+                                        if (p.getChildren() == null) {
+                                                // Should be initialized by default, but safe check or direct access
+                                                // DTO builder initialized it?
+                                                // In my DTO change I initialized it in `from`.
+                                        }
+                                        p.getChildren().add(dto);
+                                } else {
+                                        // Parent not found in list (maybe deleted?), treat as root or ignore?
+                                        // Treat as root to be safe
+                                        roots.add(dto);
+                                }
+                        } else {
+                                roots.add(dto);
+                        }
+                }
+
+                return roots;
         }
 
         @Transactional
@@ -132,9 +200,12 @@ public class CommentService {
                                                         .recipientId(commentWriter.getId())
                                                         .senderId(userId)
                                                         .type(com.feelscore.back.entity.NotificationType.COMMENT_REACTION)
-                                                        .relatedId(commentId)
+                                                        .relatedId(comment.getPost().getId()) // Use post.getId()
                                                         .title("새로운 반응이 있습니다!")
-                                                        .body(user.getNickname() + "님이 회원님의 댓글에 공감했습니다: " + emotionType)
+                                                        .body(user.getNickname() + "님이 회원님의 댓글에 공감했습니다") // Simplified
+                                                                                                         // body
+                                                        .reactionType(emotionType.toString())
+                                                        .relatedContentImageUrl(comment.getPost().getImageUrl())
                                                         .build();
 
                                         notificationProducer.sendNotification(eventDto);

@@ -136,4 +136,20 @@ public class PostController {
         postService.deletePost(postId, userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * 키워드로 게시글 검색
+     * GET /api/v1/posts/search?keywords=키워드1 키워드2
+     *
+     * @param keywords 검색 키워드 (띄어쓰기로 구분)
+     * @param pageable 페이징 정보
+     * @return 검색된 게시글 목록
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<ListResponse>> searchPosts(
+            @RequestParam String keywords,
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<ListResponse> responses = postService.searchPosts(keywords, pageable);
+        return ResponseEntity.ok(responses);
+    }
 }

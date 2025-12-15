@@ -45,7 +45,6 @@ class CommentServiceTest {
         Long postId = 1L;
         Long userId = 1L;
         String content = "Test Comment";
-        EmotionType emotion = EmotionType.JOY;
 
         Post post = new Post(postId);
         Users user = Users.builder().email("test@test.com").build();
@@ -58,7 +57,8 @@ class CommentServiceTest {
         });
 
         // when
-        commentService.createComment(postId, userId, content, emotion);
+        // when
+        commentService.createComment(postId, userId, content, null);
 
         // then
         verify(commentRepository).save(any(Comment.class));

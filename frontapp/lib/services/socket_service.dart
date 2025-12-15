@@ -49,10 +49,11 @@ class SocketService {
       config: StompConfig(
         url: '$_socketUrl?token=$jwtToken',
         beforeConnect: () async {
-          if (kDebugMode)
+          if (kDebugMode) {
             print(
               'Attempting to connect to WebSocket URL: $_socketUrl?token=$jwtToken',
             );
+          }
         },
         onConnect: (StompFrame frame) {
           if (kDebugMode) print('STOMP Connected');
@@ -103,8 +104,9 @@ class SocketService {
 
   void sendMessage(String destination, Map<String, dynamic> body) {
     if (_client == null || !_client!.connected) {
-      if (kDebugMode)
+      if (kDebugMode) {
         print('❌ [Socket] Cannot send message, client not connected');
+      }
       return;
     }
 

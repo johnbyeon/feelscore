@@ -7,6 +7,10 @@ import '../services/api_service.dart';
 import '../providers/refresh_provider.dart';
 import 'follow_list_page.dart';
 import 'dm_chat_page.dart';
+import '../widgets/profile/emotion_calendar.dart';
+import 'profile_edit_page.dart';
+import 'post_detail_screen.dart';
+import 'blocked_users_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   final String userId;
@@ -32,10 +36,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
   int _followerCount = 0;
   int _followingCount = 0;
 
+  // New: posts state
+  List<dynamic> _posts = [];
+  bool _isPostsLoading = true;
+
+  // Tagged posts state
+  List<dynamic> _taggedPosts = [];
+  bool _isTaggedPostsLoading = true;
+
   @override
   void initState() {
     super.initState();
     _fetchStats();
+    _fetchPosts();
+    _fetchTaggedPosts();
   }
 
   Future<void> _fetchStats() async {
@@ -54,7 +68,50 @@ class _UserProfilePageState extends State<UserProfilePage> {
         setState(() {
           _isLoading = false;
         });
-        // Error handling can be silent or retry, but let's just log or ignore for now as UI will show 0
+      }
+    }
+  }
+
+  // New: fetch posts for the user
+  Future<void> _fetchPosts() async {
+    try {
+      // Api expects int userId
+      final int uid = int.parse(widget.userId);
+      final result = await _apiService.getPostsByUser(uid, page: 0, size: 100);
+      // Assuming API returns a map with 'content' list
+      final List<dynamic> posts = result['content'] ?? [];
+      if (mounted) {
+        setState(() {
+          _posts = posts;
+          _isPostsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _posts = [];
+          _isPostsLoading = false;
+        });
+      }
+    }
+  }
+
+  // Fetch tagged posts
+  Future<void> _fetchTaggedPosts() async {
+    try {
+      final result = await _apiService.getTaggedPosts(widget.userId);
+      if (mounted) {
+        setState(() {
+          _taggedPosts = result;
+          _isTaggedPostsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _taggedPosts = [];
+          _isTaggedPostsLoading = false;
+        });
       }
     }
   }
@@ -149,6 +206,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       // Wait for build to finish before refreshing state
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _fetchStats();
+        _fetchPosts();
         context.read<RefreshProvider>().consumeRefreshProfile();
       });
     }
@@ -256,7 +314,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
-                                _buildStatColumn('0', 'Posts'),
+                                _buildStatColumn('${_posts.length}', 'Posts'),
                                 GestureDetector(
                                   onTap: () {
                                     Navigator.push(
@@ -313,36 +371,105 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'FellScore User',
+                        'FeelScore User',
                         style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
+                      // Emotion History Calendar
+                      EmotionCalendar(userId: widget.userId),
+                      const SizedBox(height: 20),
                       // Action Button
+                      if (isMe)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => const ProfileEditPage(),
+                                    ),
+                                  ).then((value) {
+                                    if (value == true) {
+                                      // Refresh profile could be handled here if we had a method to reload user details
+                                      // Context.read<UserProvider>().reload(); // if available
+                                    }
+                                  });
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: Colors.grey[400]!),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                ),
+                                child: const Text(
+                                  '프로필 수정',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  await userProvider.logout();
+                                  if (context.mounted) {
+                                    Navigator.of(
+                                      context,
+                                    ).popUntil((route) => route.isFirst);
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: Colors.grey[400]!),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                ),
+                                child: const Text(
+                                  '로그아웃',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 8),
+                      // 차단 유저 보기 버튼 (내 프로필일 때만)
                       if (isMe)
                         SizedBox(
                           width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              await userProvider.logout();
-                              if (context.mounted) {
-                                Navigator.of(
-                                  context,
-                                ).popUntil((route) => route.isFirst);
-                              }
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => const BlockedUsersPage(),
+                                ),
+                              );
                             },
+                            icon: const Icon(Icons.block, size: 18),
+                            label: const Text('차단된 사용자'),
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Colors.grey[400]!),
+                              side: BorderSide(color: Colors.grey[600]!),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
-                            child: const Text(
-                              '로그아웃',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                             ),
                           ),
                         )
@@ -407,7 +534,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   '메시지',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ),
@@ -418,29 +545,26 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   ),
                 ),
               ),
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    indicatorColor: Colors.white,
+                    tabs: const [
+                      Tab(icon: Icon(Icons.grid_on, color: Colors.white)),
+                      Tab(
+                        icon: Icon(
+                          Icons.person_pin_outlined,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                pinned: true,
+              ),
             ];
           },
-          body: Column(
-            children: [
-              TabBar(
-                indicatorColor: Colors.white,
-                tabs: [
-                  Tab(icon: Icon(Icons.grid_on, color: Colors.white)),
-                  Tab(
-                    icon: Icon(Icons.person_pin_outlined, color: Colors.white),
-                  ),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildGridPosts(),
-                    const Center(child: Text('No tagged posts')),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          body: TabBarView(children: [_buildGridPosts(), _buildTaggedPosts()]),
         ),
       ),
     );
@@ -463,7 +587,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _buildGridPosts() {
-    // Placeholder grid
+    if (_isPostsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_posts.isEmpty) {
+      return const Center(child: Text('게시물이 없습니다.'));
+    }
     return GridView.builder(
       padding: EdgeInsets.zero,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -471,13 +600,112 @@ class _UserProfilePageState extends State<UserProfilePage> {
         crossAxisSpacing: 2,
         mainAxisSpacing: 2,
       ),
-      itemCount: 0, // Mock count
+      itemCount: _posts.length,
       itemBuilder: (context, index) {
-        return Container(
-          color: Colors.grey[300],
-          child: const Icon(Icons.image, color: Colors.white),
+        final post = _posts[index];
+        final imageUrl = post['imageUrl'];
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
+            );
+          },
+          child:
+              imageUrl != null
+                  ? Image.network(
+                    'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/$imageUrl',
+                    fit: BoxFit.cover,
+                  )
+                  : Container(
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image, color: Colors.white),
+                  ),
         );
       },
     );
+  }
+
+  Widget _buildTaggedPosts() {
+    if (_isTaggedPostsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_taggedPosts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person_pin_outlined, size: 64, color: Colors.grey[600]),
+            const SizedBox(height: 16),
+            Text(
+              '태그된 게시글이 없습니다',
+              style: TextStyle(color: Colors.grey[500], fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
+      itemCount: _taggedPosts.length,
+      itemBuilder: (context, index) {
+        final post = _taggedPosts[index];
+        final imageUrl = post['imageUrl'];
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
+            );
+          },
+          child:
+              imageUrl != null
+                  ? Image.network(
+                    'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/$imageUrl',
+                    fit: BoxFit.cover,
+                  )
+                  : Container(
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image, color: Colors.white),
+                  ),
+        );
+      },
+    );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final TabBar _tabBar;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }

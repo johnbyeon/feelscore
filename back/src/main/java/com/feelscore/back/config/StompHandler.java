@@ -41,6 +41,12 @@ public class StompHandler implements ChannelInterceptor {
                     .map(header -> header.startsWith("Bearer ") ? header.substring(7) : header)
                     .orElse(null);
 
+            // 쿼리 파라미터로 전달된 토큰 처리 (Fallback)
+            if (token == null) {
+                // NativeHeader에 없을 경우, 혹시 모를 로직(현재 핸드쉐이크 인터셉터가 없으므로 쿼리 파라미터 직접 접근 불가)
+                // 하지만 클라이언트가 stompConnectHeaders에 넣었으므로 여기로 들어와야 정상.
+            }
+
             if (token != null) {
                 try {
                     if (jwtTokenService.isExpired(token)) {

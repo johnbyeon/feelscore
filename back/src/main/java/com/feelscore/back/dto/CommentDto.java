@@ -15,6 +15,7 @@ public class CommentDto {
     @NoArgsConstructor
     public static class Request {
         private String content;
+        private Long parentId;
     }
 
     @Getter
@@ -28,6 +29,8 @@ public class CommentDto {
         private String userProfileImageUrl;
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
         private LocalDateTime createdAt;
+        private Long parentId;
+        private java.util.List<Response> children;
 
         private java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts;
         private com.feelscore.back.entity.EmotionType myReaction;
@@ -42,6 +45,8 @@ public class CommentDto {
                     .userNickname(comment.getUsers().getNickname())
                     .userProfileImageUrl(comment.getUsers().getProfileImageUrl())
                     .createdAt(comment.getCreatedAt())
+                    .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
+                    .children(new java.util.ArrayList<>())
                     .reactionCounts(reactionCounts)
                     .myReaction(myReaction)
                     .build();
@@ -55,6 +60,8 @@ public class CommentDto {
                     .userNickname(comment.getUsers().getNickname())
                     .userProfileImageUrl(comment.getUsers().getProfileImageUrl())
                     .createdAt(comment.getCreatedAt())
+                    .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
+                    .children(new java.util.ArrayList<>())
                     .build();
         }
     }

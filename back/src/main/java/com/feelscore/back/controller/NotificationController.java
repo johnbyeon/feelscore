@@ -31,4 +31,22 @@ public class NotificationController {
 
                 return ResponseEntity.ok(notificationService.getMyNotifications(userDetails.getUser(), pageable));
         }
+
+        @GetMapping("/unread-count")
+        public ResponseEntity<Long> getUnreadNotificationCount(@AuthenticationPrincipal CustomUserDetails userDetails) {
+                long count = notificationService.getUnreadNotificationCount(userDetails.getUser());
+                return ResponseEntity.ok(count);
+        }
+
+        @org.springframework.web.bind.annotation.PostMapping("/read-all")
+        public ResponseEntity<Void> markAllAsRead(@AuthenticationPrincipal CustomUserDetails userDetails) {
+                notificationService.markAllAsRead(userDetails.getUser());
+                return ResponseEntity.ok().build();
+        }
+
+        @org.springframework.web.bind.annotation.DeleteMapping
+        public ResponseEntity<Void> clearAllNotifications(@AuthenticationPrincipal CustomUserDetails userDetails) {
+                notificationService.clearMyNotifications(userDetails.getUser());
+                return ResponseEntity.ok().build();
+        }
 }

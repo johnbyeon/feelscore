@@ -16,6 +16,9 @@ public interface PostEmotionRepository extends JpaRepository<PostEmotion, Long> 
         // 게시글 ID로 감정 분석 결과 조회
         Optional<PostEmotion> findByPost_Id(Long postId);
 
+        // 게시글 엔티티로 감정 분석 결과 조회
+        Optional<PostEmotion> findByPost(com.feelscore.back.entity.Post post);
+
         // 분석 완료된 감정 데이터만 조회
         List<PostEmotion> findByIsAnalyzed(Boolean isAnalyzed);
 

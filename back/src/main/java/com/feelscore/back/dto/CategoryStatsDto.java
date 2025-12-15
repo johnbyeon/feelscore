@@ -13,5 +13,7 @@ public class CategoryStatsDto {
     private String name;
     private EmotionType dominantEmotion;
     private Long score;
+    private Long commentCount;
+    private String trend; // UP, DOWN, STABLE, NONE
     private List<CategoryStatsDto> children;
 }

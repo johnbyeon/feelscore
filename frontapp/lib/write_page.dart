@@ -368,6 +368,10 @@ class _WritePageState extends State<WritePage> {
                               context
                                   .read<RefreshProvider>()
                                   .triggerRefreshHistory();
+                              // Trigger profile refresh
+                              context
+                                  .read<RefreshProvider>()
+                                  .triggerRefreshProfile();
 
                               // Navigate to Home
                               widget.onPostSuccess?.call();

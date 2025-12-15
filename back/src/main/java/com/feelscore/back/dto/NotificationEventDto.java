@@ -19,4 +19,6 @@ public class NotificationEventDto {
     private Long relatedId; // PostId, CommentId, or UserId (for Follow)
     private String title;
     private String body;
+    private String reactionType;
+    private String relatedContentImageUrl;
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../utils/emotion_asset_helper.dart';
 
 class CommentSheet extends StatefulWidget {
   final String postId;
@@ -16,10 +17,112 @@ class _CommentSheetState extends State<CommentSheet> {
   List<dynamic> _comments = [];
   bool _isLoading = true;
 
+  Map<String, dynamic>? _replyingTo;
+  final FocusNode _commentFocusNode = FocusNode();
+  final Set<int> _expandedCommentIds = {};
+
+  bool _isSearchingUsers = false;
+  List<dynamic> _userSuggestions = [];
+  String _currentTagQuery = '';
+  // ignore: unused_field
+  int _tagStartIndex = -1;
+
   @override
   void initState() {
     super.initState();
     _fetchComments();
+    _commentController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    final text = _commentController.text;
+    final selection = _commentController.selection;
+
+    // Only search if cursor is valid
+    if (selection.baseOffset < 0) return;
+
+    // Detect if we are typing a tag
+    // Simple logic: look for last '@' before cursor
+    final textBeforeCursor = text.substring(0, selection.baseOffset);
+    final lastAtParams = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtParams >= 0) {
+      // Check if it's a valid tag start (start of line or preceded by space)
+      bool isValidStart =
+          lastAtParams == 0 || textBeforeCursor[lastAtParams - 1] == ' ';
+
+      if (isValidStart) {
+        final query = textBeforeCursor.substring(lastAtParams + 1);
+        // Only trigger search if query doesn't contain spaces (simple tag logic)
+        if (!query.contains(' ')) {
+          setState(() {
+            _isSearchingUsers = true;
+            _currentTagQuery = query;
+            _tagStartIndex = lastAtParams;
+          });
+          _searchUsers(query);
+          return;
+        }
+      }
+    }
+
+    if (_isSearchingUsers) {
+      setState(() {
+        _isSearchingUsers = false;
+        _userSuggestions = [];
+      });
+    }
+  }
+
+  Future<void> _searchUsers(String query) async {
+    try {
+      // Use getFollowings API for suggestions
+      // We might need a dedicated search API later, but followings is good for MVP
+      final users = await _apiService.getFollowings('me', query: query);
+      if (mounted && _isSearchingUsers && _currentTagQuery == query) {
+        setState(() {
+          _userSuggestions = users;
+        });
+      }
+    } catch (e) {
+      print('Error searching users: $e');
+    }
+  }
+
+  void _selectUserTag(dynamic user) {
+    final nickname = user['nickname'];
+    final text = _commentController.text;
+    final selection = _commentController.selection;
+
+    // Find the tag we are replacing
+    final textBeforeCursor = text.substring(0, selection.baseOffset);
+    final lastAtParams = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtParams >= 0) {
+      final newText = text.replaceRange(
+        lastAtParams,
+        selection.baseOffset,
+        '@$nickname ',
+      );
+      _commentController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: (lastAtParams + nickname.length + 2).toInt(),
+        ), // +1 for @, +1 for space
+      );
+    }
+
+    setState(() {
+      _isSearchingUsers = false;
+      _userSuggestions = [];
+    });
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _commentFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchComments() async {
@@ -41,11 +144,21 @@ class _CommentSheetState extends State<CommentSheet> {
     if (_commentController.text.trim().isEmpty) return;
 
     final content = _commentController.text.trim();
+    final parentId = _replyingTo?['id'];
+
     _commentController.clear();
-    FocusScope.of(context).unfocus();
+    _commentFocusNode.unfocus();
+
+    setState(() {
+      _replyingTo = null;
+    });
 
     try {
-      await _apiService.createComment(widget.postId, content);
+      await _apiService.createComment(
+        widget.postId,
+        content,
+        parentId: parentId,
+      );
       await _fetchComments(); // Refresh list
     } catch (e) {
       print('Error creating comment: $e');
@@ -53,6 +166,13 @@ class _CommentSheetState extends State<CommentSheet> {
         context,
       ).showSnackBar(const SnackBar(content: Text('댓글 작성에 실패했습니다.')));
     }
+  }
+
+  void _handleReply(Map<String, dynamic> comment) {
+    setState(() {
+      _replyingTo = comment;
+    });
+    _commentFocusNode.requestFocus();
   }
 
   @override
@@ -68,7 +188,6 @@ class _CommentSheetState extends State<CommentSheet> {
       ),
       child: Column(
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -93,8 +212,6 @@ class _CommentSheetState extends State<CommentSheet> {
           ),
           const SizedBox(height: 8),
           const Divider(height: 1),
-
-          // List
           Expanded(
             child:
                 _isLoading
@@ -110,135 +227,71 @@ class _CommentSheetState extends State<CommentSheet> {
                       padding: const EdgeInsets.all(16),
                       itemCount: _comments.length,
                       itemBuilder: (context, index) {
-                        final comment = _comments[index];
-                        final userProfile = comment['userProfileImageUrl'];
-                        final nickname = comment['userNickname'] ?? '익명';
-                        final content = comment['content'] ?? '';
-                        final date =
-                            comment['createdAt']?.substring(0, 10) ?? '';
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CircleAvatar(
-                                radius: 16,
-                                backgroundColor: Colors.grey[800],
-                                backgroundImage:
-                                    userProfile != null
-                                        ? NetworkImage(
-                                          'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/$userProfile',
-                                        )
-                                        : null,
-                                child:
-                                    userProfile == null
-                                        ? const Icon(
-                                          Icons.person,
-                                          size: 20,
-                                          color: Colors.white,
-                                        )
-                                        : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          nickname,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          date,
-                                          style: TextStyle(
-                                            color: Colors.grey[500],
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      content,
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    // Reactions Row
-                                    Row(
-                                      children: [
-                                        GestureDetector(
-                                          onTap:
-                                              () => _showReactionPicker(
-                                                comment['id'].toString(),
-                                              ),
-                                          child: Text(
-                                            "공감하기",
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        // Display Counts
-                                        if (comment['reactionCounts'] != null)
-                                          ...((comment['reactionCounts']
-                                                  as Map<String, dynamic>)
-                                              .entries
-                                              .map((entry) {
-                                                if ((entry.value as int) > 0) {
-                                                  return Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                          left: 4.0,
-                                                        ),
-                                                    child: Container(
-                                                      padding:
-                                                          EdgeInsets.symmetric(
-                                                            horizontal: 4,
-                                                            vertical: 2,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.grey[800],
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              4,
-                                                            ),
-                                                      ),
-                                                      child: Text(
-                                                        "${_getEmotionText(entry.key)} ${entry.value}",
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          color: Colors.white,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                }
-                                                return SizedBox.shrink();
-                                              })
-                                              .toList()),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
+                        return _buildCommentTree(_comments[index]);
                       },
                     ),
           ),
-
-          // Input
+          if (_replyingTo != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.grey[900],
+              child: Row(
+                children: [
+                  Text(
+                    "답글 작성 중: ${_replyingTo!['userNickname'] ?? '익명'}",
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _cancelReply,
+                    child: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (_isSearchingUsers && _userSuggestions.isNotEmpty)
+            Container(
+              constraints: BoxConstraints(maxHeight: 150),
+              decoration: BoxDecoration(
+                color: Colors.grey[850],
+                border: Border(top: BorderSide(color: Colors.grey[800]!)),
+              ),
+              child: ListView.builder(
+                itemCount: _userSuggestions.length,
+                itemBuilder: (context, index) {
+                  final user = _userSuggestions[index];
+                  return ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 12,
+                      backgroundImage:
+                          user['profileImageUrl'] != null
+                              ? NetworkImage(
+                                'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/${user['profileImageUrl']}',
+                              )
+                              : null,
+                      child:
+                          user['profileImageUrl'] == null
+                              ? Icon(
+                                Icons.person,
+                                size: 12,
+                                color: Colors.white,
+                              )
+                              : null,
+                    ),
+                    title: Text(
+                      user['nickname'] ?? 'Unknown',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () => _selectUserTag(user),
+                  );
+                },
+              ),
+            ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -249,12 +302,12 @@ class _CommentSheetState extends State<CommentSheet> {
                 children: [
                   Expanded(
                     child: TextField(
+                      focusNode: _commentFocusNode,
                       controller: _commentController,
-                      style: const TextStyle(
-                        color: Colors.white,
-                      ), // Updated text color
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: '댓글 달기...',
+                        hintText:
+                            _replyingTo != null ? '답글을 입력하세요...' : '댓글 달기...',
                         hintStyle: TextStyle(color: Colors.grey[400]),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
@@ -280,6 +333,194 @@ class _CommentSheetState extends State<CommentSheet> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingTo = null;
+    });
+    _commentFocusNode.unfocus();
+  }
+
+  Widget _buildCommentTree(dynamic comment) {
+    final children = comment['children'] as List<dynamic>? ?? [];
+    final commentId = comment['id'] as int;
+    final isExpanded = _expandedCommentIds.contains(commentId);
+
+    if (children.isEmpty) {
+      return _buildCommentRow(comment);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCommentRow(comment),
+        Padding(
+          padding: const EdgeInsets.only(left: 48.0, bottom: 12.0),
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                if (isExpanded) {
+                  _expandedCommentIds.remove(commentId);
+                } else {
+                  _expandedCommentIds.add(commentId);
+                }
+              });
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 24, height: 1, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text(
+                  isExpanded ? "답글 접기" : "답글 ${children.length}개 더 보기",
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isExpanded)
+          Padding(
+            padding: const EdgeInsets.only(left: 32.0),
+            child: Column(
+              children: children.map((c) => _buildCommentTree(c)).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCommentRow(dynamic comment) {
+    final userProfile = comment['userProfileImageUrl'];
+    final nickname = comment['userNickname'] ?? '익명';
+    final content = comment['content'] ?? '';
+    final date = comment['createdAt']?.substring(0, 10) ?? '';
+    final commentId = comment['id'];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: Colors.grey[800],
+            backgroundImage:
+                userProfile != null
+                    ? NetworkImage(
+                      'https://feelscore-s3.s3.ap-northeast-2.amazonaws.com/$userProfile',
+                    )
+                    : null,
+            child:
+                userProfile == null
+                    ? const Icon(Icons.person, size: 20, color: Colors.white)
+                    : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      nickname,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      date,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(content, style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap:
+                          () => _showReactionPicker(comment['id'].toString()),
+                      child: Text(
+                        "공감하기",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: () => _handleReply(comment),
+                      child: Text(
+                        "답글 달기",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (comment['reactionCounts'] != null)
+                      ...((comment['reactionCounts'] as Map<String, dynamic>)
+                          .entries
+                          .map((entry) {
+                            if ((entry.value as int) > 0) {
+                              return Padding(
+                                padding: const EdgeInsets.only(left: 4.0),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Image.asset(
+                                        EmotionAssetHelper.getAssetPath(
+                                          entry.key,
+                                        ),
+                                        width: 16,
+                                        height: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "${entry.value}",
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                            return SizedBox.shrink();
+                          })
+                          .toList()),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -330,10 +571,12 @@ class _CommentSheetState extends State<CommentSheet> {
                         },
                         child: Column(
                           children: [
-                            Icon(
-                              Icons.emoji_emotions_outlined,
-                              size: 30,
-                            ), // Placeholder icon
+                            Image.asset(
+                              EmotionAssetHelper.getAssetPath(eKey),
+                              width: 40,
+                              height: 40,
+                            ),
+                            const SizedBox(height: 4),
                             Text(
                               _getEmotionText(eKey),
                               style: TextStyle(fontSize: 12),

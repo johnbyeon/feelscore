@@ -1,12 +1,18 @@
 package com.feelscore.back.service;
 
+import com.feelscore.back.entity.EmotionType;
+import com.feelscore.back.entity.UserEmotion;
 import com.feelscore.back.entity.Users;
+import com.feelscore.back.repository.UserEmotionRepository;
 import com.feelscore.back.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.NoSuchElementException;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +28,8 @@ public class UserService {
     private final NotificationService notificationService;
     private final S3Service s3Service;
     private final DmService dmService;
+    private final UserEmotionRepository userEmotionRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 회원 탈퇴 (계정 삭제)
@@ -97,4 +105,105 @@ public class UserService {
         // 10. 유저 삭제
         userRepository.delete(user);
     }
+
+    @Transactional
+    public void updateTodayEmotion(Long userId, EmotionType emotion) {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("User not found"));
+
+        LocalDate today = LocalDate.now();
+        UserEmotion userEmotion = userEmotionRepository.findByUsersAndDate(user, today)
+                .orElse(UserEmotion.builder()
+                        .users(user)
+                        .date(today)
+                        .emotion(emotion)
+                        .build());
+
+        if (userEmotion.getId() != null) {
+            userEmotion.updateEmotion(emotion);
+        } else {
+            userEmotionRepository.save(userEmotion);
+        }
+    }
+
+    public List<Map<String, Object>> getFollowersTodayStatus(Long userId) {
+        // 1. 내가 팔로우하는 유저 목록 조회
+        List<Users> followingUsers = followService.getFollowingUsers(userId);
+
+        if (followingUsers.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. 오늘의 감정 조회
+        LocalDate today = LocalDate.now();
+        List<UserEmotion> emotions = userEmotionRepository
+                .findAllByUsersInAndDate(followingUsers, today);
+
+        // 3. Map으로 변환 (UserId -> Emotion)
+        Map<Long, EmotionType> emotionMap = emotions.stream()
+                .collect(Collectors.toMap(
+                        ue -> ue.getUsers().getId(),
+                        UserEmotion::getEmotion));
+
+        // 4. 결과 리스트 생성
+        return followingUsers.stream()
+                .map(u -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("userId", u.getId());
+                    map.put("nickname", u.getNickname());
+                    map.put("profileImageUrl", u.getProfileImageUrl());
+                    // 감정이 없으면 NEUTRAL
+                    map.put("emotion",
+                            emotionMap.getOrDefault(u.getId(), EmotionType.NEUTRAL).name());
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getMyTodayEmotion(Long userId) {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Optional<UserEmotion> emotion = userEmotionRepository.findByUsersAndDate(user, LocalDate.now());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("emotion", emotion.map(UserEmotion::getEmotion).orElse(EmotionType.NEUTRAL));
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getEmotionHistory(Long userId, LocalDate startDate, LocalDate endDate) {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<UserEmotion> emotions = userEmotionRepository.findAllByUsersAndDateBetween(user, startDate, endDate);
+
+        return emotions.stream().map(ue -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("date", ue.getDate());
+            map.put("emotion", ue.getEmotion());
+            return map;
+        }).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateProfile(Long userId, String nickname, String currentPassword, String newPassword) {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (nickname != null && !nickname.isEmpty()) {
+            user.updateNickname(nickname);
+        }
+
+        if (newPassword != null && !newPassword.isEmpty()) {
+            if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
+                throw new RuntimeException("Current password does not match");
+            }
+            user.setPassword(passwordEncoder.encode(newPassword));
+        }
+
+        userRepository.save(user);
+    }
+
 }

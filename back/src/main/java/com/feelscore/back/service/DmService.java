@@ -113,8 +113,24 @@ public class DmService {
 
         senderMember.updateLastRead(message);
 
-        // 수신자에게 알림 생성 (수신자가 존재하고, 나 자신에게 보낸게 아닐 때)
+        // 발신자가 숨겼던 채팅방이면 다시 표시
+        if (senderMember.isHidden()) {
+            senderMember.unhide();
+        }
+
+        // 수신자의 숨김 해제 및 알림 생성
         if (receiver != null && !senderId.equals(receiverId)) {
+            // 수신자의 채팅방 멤버 정보 조회
+            DmThreadMember receiverMember = dmThreadMemberRepository
+                    .findByThreadIdAndUserId(thread.getId(), receiverId)
+                    .orElse(null);
+
+            // 수신자가 숨겼던 채팅방이면 다시 표시
+            if (receiverMember != null && receiverMember.isHidden()) {
+                receiverMember.unhide();
+                log.info("Unhiding thread for receiver userId={}", receiverId);
+            }
+
             log.info("Triggering notification for userId={} (Nickname={})", receiver.getId(), receiver.getNickname());
 
             if (receiver.getFcmToken() == null) {
@@ -267,6 +283,42 @@ public class DmService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 전체 안 읽은 메시지 수 조회 (메인 + 요청)
+     */
+    @Transactional(readOnly = true)
+    public long getTotalUnreadCount(Long userId) {
+        long totalUnread = 0;
+
+        // 1. Inbox (Primary)
+        List<DmThreadMember> primaryMembers = dmThreadMemberRepository.findByUserIdAndFolderAndHiddenFalse(userId,
+                DmFolder.PRIMARY);
+        List<DmThreadMember> filteredPrimary = filterBlockedMembers(userId, primaryMembers);
+        for (DmThreadMember member : filteredPrimary) {
+            if (member.getLastReadMessage() != null) {
+                totalUnread += dmMessageRepository.countByThreadIdAndIdGreaterThan(
+                        member.getThread().getId(), member.getLastReadMessage().getId());
+            } else {
+                totalUnread += dmMessageRepository.countByThreadId(member.getThread().getId());
+            }
+        }
+
+        // 2. Requests
+        List<DmThreadMember> requestMembers = dmThreadMemberRepository.findByUserIdAndStateAndHiddenFalse(userId,
+                DmMemberState.REQUEST);
+        List<DmThreadMember> filteredRequests = filterBlockedMembers(userId, requestMembers);
+        for (DmThreadMember member : filteredRequests) {
+            if (member.getLastReadMessage() != null) {
+                totalUnread += dmMessageRepository.countByThreadIdAndIdGreaterThan(
+                        member.getThread().getId(), member.getLastReadMessage().getId());
+            } else {
+                totalUnread += dmMessageRepository.countByThreadId(member.getThread().getId());
+            }
+        }
+
+        return totalUnread;
+    }
+
     private List<DmThreadMember> filterBlockedMembers(Long userId, List<DmThreadMember> members) {
         Users me = findUser(userId);
         List<Block> blocks = blockRepository.findByBlocker(me);
@@ -397,6 +449,15 @@ public class DmService {
     private Users findUser(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("유저를 찾을 수 없습니다. id=" + id));
+    }
+
+    /**
+     * 1:1 대화방 존재 여부 확인 (ID 반환)
+     */
+    @Transactional(readOnly = true)
+    public Long findExistingDirectThreadId(Long senderId, Long receiverId) {
+        DmThread thread = dmThreadRepository.findDirectThreadBetween(senderId, receiverId).orElse(null);
+        return (thread != null) ? thread.getId() : null;
     }
 
     @Transactional

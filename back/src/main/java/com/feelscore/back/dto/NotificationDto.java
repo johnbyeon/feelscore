@@ -22,6 +22,8 @@ public class NotificationDto {
         private Long relatedId;
         private boolean isRead;
         private LocalDateTime createdAt;
+        private String reactionType;
+        private String relatedContentImageUrl;
 
         // Sender info
         private Long senderId;
@@ -35,7 +37,9 @@ public class NotificationDto {
                     .content(notification.getContent())
                     .relatedId(notification.getRelatedId())
                     .isRead(notification.isRead())
-                    .createdAt(notification.getCreatedAt());
+                    .createdAt(notification.getCreatedAt())
+                    .reactionType(notification.getReactionType())
+                    .relatedContentImageUrl(notification.getRelatedContentImageUrl());
 
             if (notification.getSender() != null) {
                 builder.senderId(notification.getSender().getId())

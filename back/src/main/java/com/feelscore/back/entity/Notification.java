@@ -38,14 +38,23 @@ public class Notification extends BaseTimeEntity {
     @Column(name = "is_read", nullable = false)
     private boolean isRead;
 
+    @Column(name = "reaction_type")
+    private String reactionType; // LIKE, LOVE, HAHA, etc.
+
+    @Column(name = "related_content_image_url")
+    private String relatedContentImageUrl; // Snapshot of post image
+
     @Builder
-    public Notification(Users recipient, Users sender, NotificationType type, String content, Long relatedId) {
+    public Notification(Users recipient, Users sender, NotificationType type, String content, Long relatedId,
+            String reactionType, String relatedContentImageUrl) {
         this.recipient = recipient;
         this.sender = sender;
         this.type = type;
         this.content = content;
         this.relatedId = relatedId;
         this.isRead = false;
+        this.reactionType = reactionType;
+        this.relatedContentImageUrl = relatedContentImageUrl;
     }
 
     public void markAsRead() {

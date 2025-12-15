@@ -4,9 +4,10 @@ import 'providers/refresh_provider.dart';
 import 'providers/user_provider.dart';
 import 'screens/user_profile_page.dart';
 import 'write_page.dart';
-import 'history_page.dart';
+
 import 'home_page.dart';
 import 'screens/dm_inbox_page.dart';
+import 'services/socket_service.dart';
 
 class WebMainScreen extends StatefulWidget {
   const WebMainScreen({super.key});
@@ -18,10 +19,33 @@ class WebMainScreen extends StatefulWidget {
 class _WebMainScreenState extends State<WebMainScreen> {
   int _selectedIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initSocket();
+    });
+  }
+
+  Future<void> _initSocket() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    if (!SocketService().isConnected) {
+      String? token = userProvider.accessToken;
+      if (token != null) {
+        SocketService().connect(
+          token,
+          onConnect: () {
+            print('WebMainScreen: Global Socket Connected');
+          },
+        );
+      }
+    }
+  }
+
   late final List<Widget> _pages = [
     const HomePage(),
     WritePage(onPostSuccess: () => _onItemTapped(0)),
-    const HistoryPage(),
+
     const DmInboxPage(),
     Consumer<UserProvider>(
       builder: (context, userProvider, child) {
@@ -35,9 +59,9 @@ class _WebMainScreenState extends State<WebMainScreen> {
   ];
 
   void _onItemTapped(int index) {
-    if (index == 2) {
-      context.read<RefreshProvider>().triggerRefreshHistory();
-    } else if (index == 4) {
+    if (index == 0) {
+      context.read<RefreshProvider>().triggerRefreshHome();
+    } else if (index == 3) {
       context.read<RefreshProvider>().triggerRefreshProfile();
     }
     setState(() {
@@ -64,11 +88,6 @@ class _WebMainScreenState extends State<WebMainScreen> {
                 icon: Icon(Icons.add_circle_outline),
                 selectedIcon: Icon(Icons.add_circle_rounded),
                 label: Text('Write'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.history_rounded),
-                selectedIcon: Icon(Icons.history_edu_rounded),
-                label: Text('History'),
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.mail_outline),

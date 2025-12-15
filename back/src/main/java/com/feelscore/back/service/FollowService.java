@@ -1,7 +1,7 @@
 package com.feelscore.back.service;
 
 import com.feelscore.back.dto.FollowDto;
-import com.feelscore.back.dto.NotificationEventDto;
+
 import com.feelscore.back.dto.UsersDto;
 import com.feelscore.back.entity.Follow;
 import com.feelscore.back.entity.Users;
@@ -27,6 +27,7 @@ public class FollowService {
         private final UserRepository userRepository;
         private final BlockRepository blockRepository;
         private final NotificationProducer notificationProducer; // 🔹 알림 발송자 주입
+        private final ActiveUserService activeUserService; // 🔹 활성 유저 서비스 주입
 
         /**
          * 팔로우 토글 (팔로우 <-> 언팔로우)
@@ -108,24 +109,68 @@ public class FollowService {
         /**
          * 팔로워 목록 조회
          */
-        public List<UsersDto.SimpleResponse> getFollowers(Long userId) {
+        /**
+         * 팔로워 목록 조회 (Optional Query)
+         */
+        public List<UsersDto.SimpleResponse> getFollowers(Long userId, String query) {
                 Users user = userRepository.findById(userId)
                                 .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
 
-                return followRepository.findByFollowing(user).stream()
-                                .map(follow -> UsersDto.SimpleResponse.from(follow.getFollower()))
+                List<Follow> follows;
+                if (query != null && !query.trim().isEmpty()) {
+                        follows = followRepository.findByFollowingAndFollower_NicknameContainingIgnoreCase(user, query);
+                } else {
+                        follows = followRepository.findByFollowing(user);
+                }
+
+                return follows.stream()
+                                .map(follow -> {
+                                        Users follower = follow.getFollower();
+                                        boolean isOnline = activeUserService.isUserActive(follower.getId());
+                                        // Debug Log
+                                        System.out.println("DEBUG: getFollowers - User " + follower.getNickname() +
+                                                        " (" + follower.getId() + ") isOnline=" + isOnline);
+                                        return UsersDto.SimpleResponse.from(follower, isOnline);
+                                })
                                 .collect(Collectors.toList());
         }
 
         /**
-         * 팔로잉 목록 조회
+         * 팔로잉 목록 조회 (Optional Query: If query exists, Global Search)
          */
-        public List<UsersDto.SimpleResponse> getFollowings(Long userId) {
+        public List<UsersDto.SimpleResponse> getFollowings(Long userId, String query) {
+                // If query is present, perform Global Search (All Users)
+                if (query != null && !query.trim().isEmpty()) {
+                        return userRepository.findByNicknameContainingIgnoreCase(query).stream()
+                                        .map(user -> {
+                                                boolean isOnline = activeUserService.isUserActive(user.getId());
+                                                return UsersDto.SimpleResponse.from(user, isOnline);
+                                        })
+                                        .collect(Collectors.toList());
+                }
+
+                // If query is empty, return My Followings
                 Users user = userRepository.findById(userId)
                                 .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
 
                 return followRepository.findByFollower(user).stream()
-                                .map(follow -> UsersDto.SimpleResponse.from(follow.getFollowing()))
+                                .map(follow -> {
+                                        Users following = follow.getFollowing();
+                                        boolean isOnline = activeUserService.isUserActive(following.getId());
+                                        return UsersDto.SimpleResponse.from(following, isOnline);
+                                })
+                                .collect(Collectors.toList());
+        }
+
+        /**
+         * 팔로잉 유저 엔티티 목록 조회 (내부 로직용)
+         */
+        public List<Users> getFollowingUsers(Long userId) {
+                Users user = userRepository.findById(userId)
+                                .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
+
+                return followRepository.findByFollower(user).stream()
+                                .map(Follow::getFollowing)
                                 .collect(Collectors.toList());
         }
 

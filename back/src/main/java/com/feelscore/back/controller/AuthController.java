@@ -59,6 +59,12 @@ public class AuthController {
 
         @PostMapping("/login")
         public ResponseEntity<?> login(@RequestBody @Valid LoginRequest req) {
+                // 1. 아이디 존재 여부 확인 (User Not Found 명시적 처리)
+                if (!userRepository.existsByEmail(req.getEmail())) {
+                        throw new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                                        "존재하지 않는 아이디입니다.");
+                }
+
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                                 req.getEmail(), req.getPassword());
 
@@ -78,6 +84,7 @@ public class AuthController {
                         user.updateLastLogin();
                         payload.put("id", user.getId());
                         payload.put("nickname", user.getNickname());
+                        payload.put("profileImageUrl", user.getProfileImageUrl()); // 프로필 이미지 URL 추가
                 });
 
                 payload.put("access_token", accessToken);

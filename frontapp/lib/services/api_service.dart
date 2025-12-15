@@ -11,8 +11,9 @@ class ApiService {
   // 1. Android Emulator: 10.0.2.2
   // 2. iOS Simulator: 127.0.0.1
   // 3. Real Device: Use your computer's local IP or DDNS
-  static const String? _manualIp =
-      '192.168.0.32'; // Local IP found via ifconfig
+  // 3. Real Device: Use your computer's local IP or DDNS
+  static const String? _manualIp = null;
+  // '192.168.0.32'; // Local IP found via ifconfig
 
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:8080/api';
@@ -270,6 +271,16 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> getPost(int postId) async {
+    final response = await _authorizedRequest('GET', '/v1/posts/$postId');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get post: ${response.body}');
+    }
+  }
+
   Future<Map<String, dynamic>> getPostsByEmotion(
     String emotionType, {
     int page = 0,
@@ -427,11 +438,22 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getFollowers(String userId) async {
-    final response = await _authorizedRequest(
-      'GET',
-      '/follows/$userId/followers',
-    );
+  Future<bool> getUserStatus(String userId) async {
+    final response = await _authorizedRequest('GET', '/user/$userId/status');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data['isOnline'] == true;
+    } else {
+      return false;
+    }
+  }
+
+  Future<List<dynamic>> getFollowers(String userId, {String? query}) async {
+    String url = '/follows/$userId/followers';
+    if (query != null && query.isNotEmpty) {
+      url += '?query=${Uri.encodeComponent(query)}';
+    }
+    final response = await _authorizedRequest('GET', url);
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -440,11 +462,12 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getFollowings(String userId) async {
-    final response = await _authorizedRequest(
-      'GET',
-      '/follows/$userId/followings',
-    );
+  Future<List<dynamic>> getFollowings(String userId, {String? query}) async {
+    String url = '/follows/$userId/followings';
+    if (query != null && query.isNotEmpty) {
+      url += '?query=${Uri.encodeComponent(query)}';
+    }
+    final response = await _authorizedRequest('GET', url);
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -496,12 +519,16 @@ class ApiService {
 
   Future<Map<String, dynamic>> createComment(
     String postId,
-    String content,
-  ) async {
+    String content, {
+    int? parentId,
+  }) async {
+    final body = <String, dynamic>{'content': content};
+    if (parentId != null) body['parentId'] = parentId;
+
     final response = await _authorizedRequest(
       'POST',
       '/posts/$postId/comments',
-      body: {'content': content},
+      body: body,
     );
 
     if (response.statusCode == 200) {
@@ -603,6 +630,22 @@ class ApiService {
     }
   }
 
+  /// Check for existing 1:1 thread
+  Future<String?> checkDmThread(String receiverId) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/dm/check-thread?receiverId=$receiverId',
+    );
+
+    if (response.statusCode == 200) {
+      return response.body; // Returns ID as string
+    } else if (response.statusCode == 204) {
+      return null;
+    } else {
+      throw Exception('Failed to check DM thread: ${response.body}');
+    }
+  }
+
   /// Send a DM message
   /// If threadId is provided, sends to that thread.
   /// If receiverId is provided (and no threadId), creates or finds a thread with that user.
@@ -610,10 +653,13 @@ class ApiService {
     String? receiverId,
     String? threadId,
     required String content,
+    String type = 'TEXT',
+    String? imageUrl,
   }) async {
-    final body = <String, dynamic>{'content': content};
+    final body = <String, dynamic>{'content': content, 'messageType': type};
     if (receiverId != null) body['receiverId'] = int.parse(receiverId);
     if (threadId != null) body['threadId'] = int.parse(threadId);
+    if (imageUrl != null) body['imageUrl'] = imageUrl;
 
     final response = await _authorizedRequest(
       'POST',
@@ -665,18 +711,6 @@ class ApiService {
     }
   }
 
-  /// Leave a DM thread (permanently)
-  Future<void> leaveDmThread(String threadId) async {
-    final response = await _authorizedRequest(
-      'DELETE',
-      '/dm/threads/$threadId/leave',
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to leave DM thread: ${response.body}');
-    }
-  }
-
   /// Mark thread messages as read
   Future<void> markAsRead(String threadId) async {
     final response = await _authorizedRequest(
@@ -686,6 +720,15 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception('Failed to mark as read: ${response.body}');
+    }
+  }
+
+  Future<int> getUnreadTotalCount() async {
+    final response = await _authorizedRequest('GET', '/dm/unread-count');
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as int;
+    } else {
+      throw Exception('Failed to get unread total count: ${response.body}');
     }
   }
 
@@ -719,6 +762,232 @@ class ApiService {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
       throw Exception('Failed to get block list: ${response.body}');
+    }
+  }
+
+  // User Status (Daily Emotion)
+  Future<void> updateTodayEmotion(String emotion) async {
+    final response = await _authorizedRequest(
+      'POST',
+      '/user/emotion/today',
+      body: {'emotion': emotion},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update today emotion: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getFollowersTodayStatus() async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/user/following/status/today',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get followers status: ${response.body}');
+    }
+  }
+
+  Future<String> getMyTodayEmotion() async {
+    final response = await _authorizedRequest('GET', '/user/emotion/today');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data['emotion'] ?? 'NEUTRAL';
+    } else {
+      throw Exception('Failed to get my today emotion: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getEmotionHistory(
+    String startDate,
+    String endDate,
+  ) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/user/emotion/history?startDate=$startDate&endDate=$endDate',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get emotion history: ${response.body}');
+    }
+  }
+
+  Future<void> updateProfile({
+    String? nickname,
+    String? currentPassword,
+    String? newPassword,
+  }) async {
+    final body = <String, String>{};
+    if (nickname != null) body['nickname'] = nickname;
+    if (currentPassword != null) body['currentPassword'] = currentPassword;
+    if (newPassword != null) body['newPassword'] = newPassword;
+
+    final response = await _authorizedRequest(
+      'PATCH',
+      '/user/profile',
+      body: body,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update profile: ${response.body}');
+    }
+  }
+
+  // Notifications
+  Future<Map<String, dynamic>> getMyNotifications({
+    int page = 0,
+    int size = 20,
+  }) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/notifications?page=$page&size=$size&sort=createdAt,desc',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Failed to get notifications: ${response.body}');
+    }
+  }
+
+  Future<int> getUnreadNotificationCount() async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/notifications/unread-count',
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      return 0;
+    }
+  }
+
+  Future<void> markNotificationsAsRead() async {
+    final response = await _authorizedRequest(
+      'POST',
+      '/notifications/read-all',
+    );
+
+    if (response.statusCode != 200) {
+      // Log error but don't crash app flow
+      print('Failed to mark notifications as read: ${response.statusCode}');
+    }
+  }
+
+  Future<void> markNotificationAsRead(int notificationId) async {
+    final response = await _authorizedRequest(
+      'POST',
+      '/notifications/$notificationId/read',
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark notification as read: ${response.body}');
+    }
+  }
+
+  Future<void> clearAllNotifications() async {
+    final response = await _authorizedRequest('DELETE', '/notifications');
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to clear notifications: ${response.body}');
+    }
+  }
+
+  /// 키워드로 게시글 검색
+  Future<Map<String, dynamic>> searchPosts(
+    String keywords, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/v1/posts/search?keywords=${Uri.encodeComponent(keywords)}&page=$page&size=$size',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to search posts: ${response.body}');
+    }
+  }
+
+  /// 특정 카테고리의 하위 카테고리 목록 가져오기
+  Future<List<dynamic>> getCategoryChildren(int categoryId) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/categories/$categoryId/children',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to get category children: ${response.body}');
+    }
+  }
+
+  /// 채팅방 나가기 (DM Thread 탈퇴)
+  Future<void> leaveThread(String threadId) async {
+    final response = await _authorizedRequest(
+      'DELETE',
+      '/dm/threads/$threadId/leave',
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to leave thread: ${response.body}');
+    }
+  }
+
+  /// 회원 탈퇴 (계정 삭제)
+  Future<void> withdrawUser() async {
+    final response = await _authorizedRequest('DELETE', '/user');
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to withdraw: ${response.body}');
+    }
+  }
+
+  /// 사용자 검색 (닉네임 기준)
+  Future<List<dynamic>> searchUsers(String query) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/user/search?q=${Uri.encodeComponent(query)}',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to search users: ${response.body}');
+    }
+  }
+
+  /// 유저가 태그된 게시글 목록 조회
+  Future<List<dynamic>> getTaggedPosts(String userId) async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/user/$userId/tagged-posts',
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to get tagged posts: ${response.body}');
+    }
+  }
+
+  /// 맞팔로우 목록 조회 (멘션 자동완성용)
+  Future<List<dynamic>> getMutualFollowers() async {
+    final response = await _authorizedRequest('GET', '/users/mutual-followers');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to get mutual followers: ${response.body}');
     }
   }
 }

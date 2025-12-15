@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/user_profile_page.dart';
 import '../services/api_service.dart';
+import '../utils/emotion_asset_helper.dart';
 import 'comment_sheet.dart';
 
 class PostCard extends StatefulWidget {
@@ -279,23 +280,47 @@ class _PostCardState extends State<PostCard> {
                           sortedReactions.map((entry) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                                horizontal: 10,
+                                vertical: 6,
                               ),
                               decoration: BoxDecoration(
                                 color: Theme.of(context)
                                     .colorScheme
                                     .primaryContainer
                                     .withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(
-                                '${_getEmotionText(entry.key)} ${entry.value}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Image.asset(
+                                    EmotionAssetHelper.getAssetPath(entry.key),
+                                    width: 20,
+                                    height: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _getEmotionText(entry.key),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${entry.value}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.normal,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.8),
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
                           }).toList(),
@@ -370,9 +395,43 @@ class _PostCardState extends State<PostCard> {
                       ),
                     ),
 
-                    // Actions (Comment & Empathize)
+                    // Actions (Empathize & Comment) - SWAPPED
                     Row(
                       children: [
+                        // Empathize Button (Expandable)
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isEmpathyExpanded = !_isEmpathyExpanded;
+                            });
+                          },
+                          child: Row(
+                            children: [
+                              // Default to Neutral image (trigger), or my reaction if exists?
+                              // User said "Neutral as default... touch -> expands".
+                              // But if I already reacted, it might be nice to show THAT.
+                              // However, strictly following "Neutral as default" for the trigger button appearance:
+                              Image.asset(
+                                EmotionAssetHelper.getAssetPath(
+                                  _myReaction ?? 'NEUTRAL',
+                                ), // Show current reaction or Neutral
+                                width: 24,
+                                height: 24,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "", // Text removed
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      _myReaction != null ? Colors.red : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
                         // Comment Button
                         GestureDetector(
                           onTap: () {
@@ -402,36 +461,6 @@ class _PostCardState extends State<PostCard> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        // Empathize Button
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _isEmpathyExpanded = !_isEmpathyExpanded;
-                            });
-                          },
-                          child: Row(
-                            children: [
-                              Icon(
-                                _myReaction != null
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                size: 20,
-                                color: _myReaction != null ? Colors.red : null,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                "공감하기",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color:
-                                      _myReaction != null ? Colors.red : null,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ],
@@ -451,82 +480,44 @@ class _PostCardState extends State<PostCard> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 16, // Increased spacing for images
+                      runSpacing: 16,
                       alignment: WrapAlignment.center,
                       children:
                           _emotionList.map((eKey) {
                             final isSelected = _myReaction == eKey;
-                            // Use local state _reactionCounts if available, else fallback to widget.post['reactionCounts'] (need to parse that if passed)
-                            // Actually _reactionCounts is initialized in _fetchReactionStats.
-                            // But we might want initial values from widget.post if available to avoid pop-in.
-                            // For now rely on _fetchReactionStats or defaults.
-                            final count = _reactionCounts[eKey] ?? 0;
-                            return GestureDetector(
-                              onTap: () => _toggleReaction(eKey),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isSelected
-                                          ? Theme.of(
-                                            context,
-                                          ).colorScheme.primaryContainer
-                                          : Theme.of(
-                                            context,
-                                          ).colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color:
+                            return Tooltip(
+                              message: _getEmotionText(
+                                eKey,
+                              ), // Preview on long press
+                              child: GestureDetector(
+                                onTap: () {
+                                  _toggleReaction(eKey);
+                                  setState(() {
+                                    _isEmpathyExpanded =
+                                        false; // Close on select
+                                  });
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.all(isSelected ? 4 : 0),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border:
                                         isSelected
-                                            ? Theme.of(
-                                              context,
-                                            ).colorScheme.primary
-                                            : Colors.grey.withValues(
-                                              alpha: 0.3,
-                                            ),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _getEmotionText(eKey),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight:
-                                            isSelected
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                        color:
-                                            isSelected
-                                                ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary
-                                                : Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurface,
-                                      ),
-                                    ),
-                                    if (count > 0) ...[
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        count.toString(),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color:
-                                              isSelected
-                                                  ? Theme.of(
+                                            ? Border.all(
+                                              color:
+                                                  Theme.of(
                                                     context,
-                                                  ).colorScheme.primary
-                                                  : Colors.grey,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                                  ).colorScheme.primary,
+                                              width: 2,
+                                            )
+                                            : null,
+                                  ),
+                                  child: Image.asset(
+                                    EmotionAssetHelper.getAssetPath(eKey),
+                                    width: 40,
+                                    height: 40,
+                                  ),
                                 ),
                               ),
                             );

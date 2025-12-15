@@ -29,6 +29,30 @@ public class NotificationService {
         return notifications.map(NotificationDto.Response::from);
     }
 
+    @Transactional(readOnly = true)
+    public long getUnreadNotificationCount(Users user) {
+        long count = notificationRepository.countByRecipientIdAndIsReadFalse(user.getId());
+        System.out.println("DEBUG_BACKEND: getUnreadNotificationCount for user " + user.getId() + " = " + count);
+        return count;
+    }
+
+    @Transactional
+    public void markAllAsRead(Users user) {
+        System.out.println("DEBUG_BACKEND: markAllAsRead (Entity Strategy) STARTED for user " + user.getId());
+        java.util.List<Notification> unreadList = notificationRepository.findAllByRecipientAndIsReadFalse(user);
+        for (Notification n : unreadList) {
+            n.markAsRead();
+        }
+        // Dirty checking will automatically save changes at the end of transaction
+        System.out.println(
+                "DEBUG_BACKEND: markAllAsRead (Entity Strategy) UPDATED " + unreadList.size() + " notifications.");
+    }
+
+    @Transactional
+    public void clearMyNotifications(Users user) {
+        notificationRepository.deleteByRecipient(user);
+    }
+
     /**
      * 알림 발송 (Producer로 이벤트 발행)
      * - DB 저장은 Consumer에서 처리됨

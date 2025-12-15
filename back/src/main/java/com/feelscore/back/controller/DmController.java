@@ -122,4 +122,25 @@ public class DmController {
         dmService.markAsRead(userDetails.getUserId(), threadId);
         return ResponseEntity.ok().build();
     }
+
+    // 11. 전체 안 읽은 메시지 수 조회
+    @GetMapping("/unread-count")
+    public ResponseEntity<Long> getUnreadTotalCount(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        long count = dmService.getTotalUnreadCount(userDetails.getUserId());
+        return ResponseEntity.ok(count);
+    }
+
+    // 10. 1:1 대화방 ID 조회 (존재 시 반환)
+    @GetMapping("/check-thread")
+    public ResponseEntity<Long> checkThread(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam Long receiverId) {
+        Long threadId = dmService.findExistingDirectThreadId(userDetails.getUserId(), receiverId);
+        if (threadId != null) {
+            return ResponseEntity.ok(threadId);
+        } else {
+            return ResponseEntity.noContent().build();
+        }
+    }
 }

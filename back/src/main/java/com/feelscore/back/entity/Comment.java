@@ -28,11 +28,19 @@ public class Comment extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Comment parent;
+
+    @OneToMany(mappedBy = "parent", orphanRemoval = true)
+    private java.util.List<Comment> children = new java.util.ArrayList<>();
+
     @Builder
-    public Comment(Post post, Users users, String content) {
+    public Comment(Post post, Users users, String content, Comment parent) {
         this.post = post;
         this.users = users;
         this.content = content;
+        this.parent = parent;
     }
 
     public void updateContent(String content) {

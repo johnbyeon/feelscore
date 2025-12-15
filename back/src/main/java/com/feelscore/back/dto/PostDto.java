@@ -49,6 +49,8 @@ public class PostDto {
 
         @NotNull(message = "카테고리를 선택해주세요")
         private Long categoryId;
+
+        private String imageUrl; // 이미지 URL 추가
     }
 
     // 게시글 상세 응답
@@ -116,6 +118,7 @@ public class PostDto {
         private Long userId; // 작성자 ID 추가
         private String userNickname;
         private String userProfileImageUrl; // 작성자 프로필 이미지 추가
+        private Long categoryId; // 카테고리 ID 추가
         private String categoryName;
         private String imageUrl;
         private LocalDateTime createdAt;
@@ -133,6 +136,7 @@ public class PostDto {
                     .userId(post.getUsers().getId())
                     .userNickname(post.getUsers().getNickname())
                     .userProfileImageUrl(post.getUsers().getProfileImageUrl())
+                    .categoryId(post.getCategory().getId())
                     .categoryName(post.getCategory().getName())
                     .imageUrl(post.getImageUrl())
                     .createdAt(post.getCreatedAt())
@@ -150,6 +154,7 @@ public class PostDto {
                     .userId(post.getUsers().getId())
                     .userNickname(post.getUsers().getNickname())
                     .userProfileImageUrl(post.getUsers().getProfileImageUrl())
+                    .categoryId(post.getCategory().getId())
                     .categoryName(post.getCategory().getName())
                     .imageUrl(post.getImageUrl())
                     .createdAt(post.getCreatedAt())

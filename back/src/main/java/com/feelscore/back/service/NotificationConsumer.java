@@ -41,6 +41,8 @@ public class NotificationConsumer {
                 .type(eventDto.getType())
                 .content(eventDto.getBody())
                 .relatedId(eventDto.getRelatedId())
+                .reactionType(eventDto.getReactionType())
+                .relatedContentImageUrl(eventDto.getRelatedContentImageUrl())
                 .build();
         notificationRepository.save(notification);
 

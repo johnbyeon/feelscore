@@ -34,6 +34,7 @@ public class PostService {
     private final com.feelscore.back.repository.PostEmotionRepository postEmotionRepository;
     private final S3Service s3Service; // Inject S3Service
     private final CommentService commentService;
+    private final MentionService mentionService;
 
     @Transactional
     public Response createPost(@Valid CreateRequest request, Long userId) {
@@ -54,6 +55,9 @@ public class PostService {
             // log.error("Failed to send analysis event", e);
             System.err.println("Failed to send analysis event: " + e.getMessage());
         }
+
+        // @멘션 처리
+        mentionService.processMentionsForPost(post, user, post.getContent());
 
         return Response.from(post);
     }
@@ -86,13 +90,14 @@ public class PostService {
             categoryIds.add(child.getId());
         }
 
-        // 2. 게시글 조회 (감정 포함)
-        Page<Object[]> results = postRepository.findByCategory_IdInAndStatusWithEmotion(categoryIds, PostStatus.NORMAL,
+        // 2. 게시글 조회 - 리액션 수 기준 정렬 (내림차순), 동점시 content 가나다순
+        Page<Object[]> results = postRepository.findByCategoryOrderByReactionCount(categoryIds, PostStatus.NORMAL,
                 pageable);
 
         return results.map(result -> {
             Post post = (Post) result[0];
             Object emotionObj = result[1];
+            // result[2]는 reactionCount (쿼리에서 가져온 값)
             String emotion = (emotionObj != null) ? emotionObj.toString() : null;
             Long commentCount = commentRepository.countByPost(post);
             List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
@@ -158,8 +163,25 @@ public class PostService {
                 .orElseThrow(
                         () -> new NoSuchElementException("Category not found with id: " + request.getCategoryId()));
 
-        post.updateContent(request.getContent()); // Post 엔티티에 updateContent 메서드 필요
-        post.updateCategory(category); // Post 엔티티에 updateCategory 메서드 필요
+        // 내용이 변경되었는지 확인
+        boolean contentChanged = !post.getContent().equals(request.getContent());
+
+        post.updateContent(request.getContent());
+        post.updateCategory(category);
+
+        // 이미지 URL 업데이트
+        if (request.getImageUrl() != null) {
+            post.updateImageUrl(request.getImageUrl());
+        }
+
+        // 내용이 변경되었으면 감정 재분석 요청
+        if (contentChanged) {
+            try {
+                postAnalysisProducer.sendAnalysisEvent(post.getId(), post.getContent());
+            } catch (Exception e) {
+                System.err.println("Failed to send re-analysis event: " + e.getMessage());
+            }
+        }
 
         return Response.from(post);
     }
@@ -201,7 +223,59 @@ public class PostService {
             }
 
             // 6. 게시글 삭제 (Hard Delete)
-            postRepository.delete(post);
         }
+    }
+
+    /**
+     * 키워드로 게시글 검색 (띄어쓰기로 구분된 키워드 중 하나라도 포함되면 반환)
+     */
+    public Page<ListResponse> searchPosts(String keywords, Pageable pageable) {
+        if (keywords == null || keywords.trim().isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        // 띄어쓰기로 키워드 분리
+        String[] keywordArray = keywords.trim().split("\\s+");
+
+        // 첫 번째 키워드로 검색 시작
+        Page<Object[]> results = postRepository.searchByKeyword(keywordArray[0], PostStatus.NORMAL, pageable);
+
+        return results.map(result -> {
+            Post post = (Post) result[0];
+            Object emotionObj = result[1];
+            String emotion = (emotionObj != null) ? emotionObj.toString() : null;
+            Long commentCount = commentRepository.countByPost(post);
+            List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
+            java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
+            for (Object[] row : reactionObjs) {
+                com.feelscore.back.entity.EmotionType type = (com.feelscore.back.entity.EmotionType) row[0];
+                Long count = (row[1] instanceof Number) ? ((Number) row[1]).longValue() : 0L;
+                reactionCounts.put(type, count);
+            }
+
+            return ListResponse.from(post, emotion, commentCount, reactionCounts);
+        });
+    }
+
+    /**
+     * 단일 게시글을 ListResponse로 변환 (외부 서비스용)
+     */
+    public ListResponse getPostListResponse(Post post, Long currentUserId) {
+        // 감정 정보 조회
+        String emotion = postEmotionRepository.findByPost(post)
+                .map(pe -> pe.getDominantEmotion().name())
+                .orElse(null);
+
+        Long commentCount = commentRepository.countByPost(post);
+
+        List<Object[]> reactionObjs = postReactionRepository.countReactionsByPost(post);
+        java.util.Map<com.feelscore.back.entity.EmotionType, Long> reactionCounts = new java.util.HashMap<>();
+        for (Object[] row : reactionObjs) {
+            com.feelscore.back.entity.EmotionType type = (com.feelscore.back.entity.EmotionType) row[0];
+            Long count = (row[1] instanceof Number) ? ((Number) row[1]).longValue() : 0L;
+            reactionCounts.put(type, count);
+        }
+
+        return ListResponse.from(post, emotion, commentCount, reactionCounts);
     }
 }
